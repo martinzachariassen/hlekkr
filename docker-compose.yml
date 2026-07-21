@@ -13,15 +13,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-shortener}
       POSTGRES_USER: ${DB_ADMIN_USER:-shortener_admin}
       POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-dev_admin_pw}
-      # Consumed by the init script to create the least-privilege app role.
-      APP_DB_USER: ${APP_DB_USER:-shortener_app}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-dev_app_pw}
     ports:
       - "5432:5432"
     volumes:
       # Postgres 18+ stores data in a version subdirectory; mount the parent, not /data.
       - pgdata:/var/lib/postgresql
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    configs:
+      # First-init SQL, inlined (no separate script file). Postgres runs *.sql in this directory as
+      # POSTGRES_USER against POSTGRES_DB on first boot.
+      - source: app_role_init
+        target: /docker-entrypoint-initdb.d/01-app-role.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_ADMIN_USER:-shortener_admin} -d ${POSTGRES_DB:-shortener}"]
       interval: 5s
@@ -73,3 +74,18 @@ services:
 
 volumes:
   pgdata:
+
+configs:
+  # Least-privilege application role (§2.9): the app connects as this DML-only role, while DDL and
+  # migrations run under the privileged POSTGRES_USER. ALTER DEFAULT PRIVILEGES makes the grants
+  # apply automatically to the tables Flyway creates next, so nothing needs re-granting afterwards.
+  # The ${VAR:-default} values are interpolated by Compose (dev-only defaults; override via .env).
+  app_role_init:
+    content: |
+      CREATE ROLE "${APP_DB_USER:-shortener_app}" LOGIN PASSWORD '${APP_DB_PASSWORD:-dev_app_pw}';
+      GRANT CONNECT ON DATABASE "${POSTGRES_DB:-shortener}" TO "${APP_DB_USER:-shortener_app}";
+      GRANT USAGE   ON SCHEMA   public TO "${APP_DB_USER:-shortener_app}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO "${APP_DB_USER:-shortener_app}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT USAGE, SELECT               ON SEQUENCES TO "${APP_DB_USER:-shortener_app}";

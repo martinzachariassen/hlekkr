@@ -3,17 +3,29 @@ info:
   title: URL Shortener API
   version: 1.0.0
   description: >
-    A security-hardened URL shortener. Creating and managing links is restricted to the
-    trusted frontend via an internal service key (`X-Internal-Key`); each link additionally
-    carries a one-time owner token used to read its stats or delete it. The redirect endpoint
-    is public — it is the short link itself.
+    A security-hardened URL shortener.
+
+
+    **Deployment topology.** In production this service has **no public domain of its own**. It runs
+    on a private network and is reached only through a trusted reverse proxy (the frontend's Caddy
+    server), which is the single public entrypoint. The proxy forwards the public surface — the
+    short-link redirect, this spec, and Swagger UI — straight through, and injects the internal
+    service key (`X-Internal-Key`) on the management routes so it never reaches a browser. As a
+    result, calling the management endpoints directly is not possible from the internet: they are
+    only reachable via the proxy, which holds the key.
+
+
+    **Authorization.** Creating and managing links is restricted to the trusted frontend via the
+    internal service key; each link additionally carries a one-time owner token used to read its
+    stats or delete it. The redirect endpoint is public — it is the short link itself.
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
 
 servers:
+  # In production the public origin is the frontend/proxy domain; the API itself is not internet-facing.
   - url: http://localhost:8080
-    description: Local development
+    description: Local development (API served directly)
 
 tags:
   - name: Links
@@ -136,7 +148,10 @@ components:
       type: apiKey
       in: header
       name: X-Internal-Key
-      description: Shared secret proving the caller is the trusted frontend. Held server-side only.
+      description: >
+        Shared secret proving the caller is the trusted frontend. Held only by the reverse proxy and
+        injected server-side — it never reaches a browser. Since the API has no public domain, these
+        routes are reachable only through that proxy; a missing or wrong key returns a generic 404.
     ownerToken:
       type: http
       scheme: bearer

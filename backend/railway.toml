@@ -1,5 +1,9 @@
 # Railway deploy config for the API service. In the Railway dashboard, set this service's
 # root directory to `backend` so this file and the Dockerfile are picked up.
+#
+# This service stays PRIVATE — do not generate a public domain for it. It's reached only over the
+# private network by the web service (the proxy). For that to work on Railway's IPv6 private
+# network, set SERVER_HOST=:: (see application.conf). Health checks run on the internal address.
 
 [build]
 builder = "dockerfile"

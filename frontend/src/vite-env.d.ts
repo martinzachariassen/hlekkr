@@ -2,7 +2,6 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE?: string;
-  readonly VITE_PUBLIC_API_URL?: string;
   readonly VITE_UMAMI_SRC?: string;
   readonly VITE_UMAMI_WEBSITE_ID?: string;
 }

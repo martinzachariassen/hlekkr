@@ -177,15 +177,17 @@ key**: the management routes require an `X-Internal-Key` header whose value only
 knows, checked in constant time, with a miss returning the same generic `404` as everything else.
 
 The key belongs to the frontend's **server**, never the browser. Here that server is the
-[Caddy](https://caddyserver.com) proxy in front of the web app (`frontend/Caddyfile`): the browser
-calls `/api/*` same-origin, Caddy injects `X-Internal-Key` and proxies to this API over Railway's
-private network. The secret never ships to the client — and because the calls are same-origin, no
-CORS is involved at all.
+[Caddy](https://caddyserver.com) proxy in front of the web app (`frontend/Caddyfile`), which is the
+**only service with a public domain**. The API sits on the private network with no public ingress of
+its own, so every public request goes through Caddy: it injects `X-Internal-Key` on `/api/*` and
+passes the genuinely public routes (redirect, spec, Swagger) straight through. The secret never ships
+to the client, and because the calls are same-origin, no CORS is involved at all.
 
 ```
-Browser ──/api/*──> Caddy (holds INTERNAL_API_KEY) ──X-Internal-Key──> Shortener API
-                                                                         /links*  key required
-Anyone ────────────────────────────────────────────────────────────────> GET /{code}  public
+                              Caddy (public, holds INTERNAL_API_KEY)      Shortener API (private)
+Browser ──/api/*────────────▶ inject X-Internal-Key ────────────────────▶ /links*      key required
+Visitor ──/{code}───────────▶ pass through ─────────────────────────────▶ GET /{code}  public
+Anyone  ──/openapi.yaml,/swagger ─▶ pass through ───────────────────────▶ docs         public
 ```
 
 This composes with the existing per-link owner token to give two independent layers: the service
@@ -199,8 +201,7 @@ A single-screen web client (Vite + React + TypeScript) lives in [`frontend/`](fr
 URL to get a short one plus a one-time owner key, then look a link up by code + key to see clicks
 or delete it. The whole thing fits one non-scrolling screen — result and stats states swap in
 place. The palette (warm paper, teal accent) borrows from [mlz.no](https://mlz.no); the body type is
-[Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), designed for legibility, paired
-with Instrument Serif for the headline.
+[Inter](https://rsms.me/inter/), paired with Instrument Serif for the headline.
 
 Privacy is the pitch, so analytics is opt-in: it integrates [Umami](https://umami.is) (cookieless),
 but ships **zero** analytics code unless `VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID` are set. See
@@ -238,45 +239,88 @@ Both `mise run dev` and `mise run backend` run the API from source with migratio
 
 ## Deploying to Railway
 
-Two Railway services from this one repo — each has its own `railway.toml` and `Dockerfile`; set each
-service's **root directory** accordingly:
+Three services in one Railway project: **web** (public), **api** (private), and **Postgres**
+(private). Only `web` is exposed to the internet — the API and database are reachable *solely* over
+Railway's private network. `web` and `api` build from this repo, each with its own `railway.toml` and
+`Dockerfile`; set each service's **root directory** to `frontend` and `backend` respectively.
 
 ```
-                        ┌───────────────────────────── Railway ─────────────────────────────┐
-Visitor ──/api/*──▶ web (Caddy)  ──X-Internal-Key──▶  api (Ktor)  ◀──▶  Postgres
-          static ◀──  root: frontend    private net    root: backend        plugin
-Visitor ──short link──────────────────────────────▶  api  GET /{code}  (public redirect)
-                        └────────────────────────────────────────────────────────────────────┘
+        ┌───────────────────── Railway project · private network ──────────────────────┐
+Internet ─▶ web (Caddy, PUBLIC) ─ /api/* + /{code} + /swagger ─▶ api (Ktor, PRIVATE) ─▶ Postgres
+            root: frontend                                       root: backend          (PRIVATE)
+            the only public domain                               SERVER_HOST=::          no public proxy
+        └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**`api` service** (root directory `backend`) — serves the public redirects and the gated management
-API:
+Deploy in that order (Postgres → api → web) so each service can find the one it depends on.
 
-- **Postgres** — add a Railway Postgres plugin and set `DATABASE_URL`, `DATABASE_USER`,
-  `DATABASE_PASSWORD`. For least privilege, run migrations under an admin role and let the app
-  connect as a DML-only role: set `RUN_MIGRATIONS_ON_STARTUP=true` with `DATABASE_MIGRATION_USER` /
-  `DATABASE_MIGRATION_PASSWORD` pointing at the privileged role, so the schema is applied on boot
-  and the app then serves under the restricted role.
+### Postgres — keep it private
+
+You already have a Postgres database in the project. Railway gives it a private hostname
+(`*.railway.internal`) and a `DATABASE_URL`. Leave its **public networking / TCP proxy disabled** so
+only services in this project can reach it — that alone satisfies "only my own services talk to the
+database."
+
+For least privilege the app connects as a **DML-only role**, separate from the privileged role that
+runs migrations. Railway's managed Postgres starts with only the `postgres` superuser, so create the
+app role once — open the database's **Data / Query** tab (or `psql` with its connection string) and
+run:
+
+```sql
+CREATE ROLE shortener_app LOGIN PASSWORD '<a strong password>';
+GRANT CONNECT ON DATABASE railway TO shortener_app;
+GRANT USAGE   ON SCHEMA   public  TO shortener_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO shortener_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE, SELECT               ON SEQUENCES TO shortener_app;
+```
+
+`ALTER DEFAULT PRIVILEGES` makes the grants apply automatically to the tables Flyway creates next, so
+there's nothing to re-grant afterwards (this mirrors the `app_role_init` config inlined in
+`docker-compose.yml`, which does the same locally). *Prefer simplicity over the extra layer?* Skip this and use `postgres` for both
+migrations and the app — you lose least privilege but nothing else works differently.
+
+### api service — private (root directory `backend`)
+
+**Do not generate a public domain for this service.** It is reached only over the private network by
+`web`. Variables:
+
+- **`SERVER_HOST=::`** — bind IPv6 so the service is reachable at `api.railway.internal`. Railway's
+  private network is IPv6-only; without this, `web` cannot connect. *(This is the single most common
+  Railway mistake.)*
+- **Database** — the app uses the restricted role; migrations run on boot under the privileged one:
+  - `DATABASE_URL` = `jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}`
+    — note the `jdbc:` prefix and the **private** `PGHOST`. (Railway's own `DATABASE_URL` is the
+    `postgresql://user:pass@host/db` form with credentials inline; this app takes the JDBC URL and the
+    credentials separately, so build it as shown.)
+  - `DATABASE_USER=shortener_app`, `DATABASE_PASSWORD=<the password you set above>`.
+  - `RUN_MIGRATIONS_ON_STARTUP=true`, `DATABASE_MIGRATION_USER=${{Postgres.PGUSER}}`,
+    `DATABASE_MIGRATION_PASSWORD=${{Postgres.PGPASSWORD}}` — the schema is applied under `postgres`,
+    then the app serves under `shortener_app`. **Both** migration variables must be set, or migrations
+    fall back to the app role (which has no DDL rights) and fail. *(Single-role setup: point all four
+    at `postgres` and omit the migration pair.)*
 - **`INTERNAL_API_KEY`** — a long random value (`openssl rand -base64 32`); set the *same* value on
-  the `web` service so Caddy can inject it. This is what locks the management API to your frontend.
-- **`BASE_URL`** — this service's own public URL, used to build `shortUrl`s and to reject
-  self-referential targets.
+  `web`. This is what locks the management API to your frontend.
+- **`BASE_URL`** — the **web** service's public URL (e.g. `https://short.up.railway.app`). Short links
+  are built from this and resolve on the public domain; it's also the self-referential target check.
 - **`TRUST_PROXY_HEADERS=true`** — so per-IP rate limiting reads the real client IP from
-  `X-Forwarded-For` (Railway's edge sets it) instead of bucketing every visitor together.
-- **`CORS_ALLOWED_ORIGINS`** — leave empty. The frontend calls the API same-origin through the proxy,
-  so no cross-origin access is needed.
+  `X-Forwarded-For` (Caddy / Railway's edge sets it) instead of bucketing every visitor together.
+- **`CORS_ALLOWED_ORIGINS`** — leave empty. The frontend calls the API same-origin through the proxy.
 
-**`web` service** (root directory `frontend`) — Caddy serving the static bundle and proxying `/api/*`:
+### web service — public (root directory `frontend`)
 
-- **`API_UPSTREAM=api.railway.internal:8080`** — the `api` service over Railway's private network.
+The only service you generate a public domain for. Variables:
+
+- **`API_UPSTREAM=api.railway.internal:8080`** — the `api` service over the private network.
 - **`INTERNAL_API_KEY`** — the same value as on `api`; Caddy injects it as `X-Internal-Key`.
-- **`VITE_PUBLIC_API_URL`** — the `api` service's public URL (used for the Swagger link, which skips
-  the proxy). **`VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID`** — optional; omit to ship zero analytics.
-  These three are read at *build* time (Vite inlines them), which Railway passes as Docker build args.
+- **`VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID`** — optional; omit to ship zero analytics. Read at
+  *build* time (Vite inlines them), so Railway passes them as Docker build args.
 
-The management API is reachable publicly on the `api` domain too, but every management route is gated
-by `INTERNAL_API_KEY` (a miss is an indistinguishable `404`), so only the proxy — which holds the key
-— can use it. The redirect endpoint stays public by design.
+Because `api` has no public domain, the management routes simply aren't reachable from the internet.
+Everything genuinely public — the `/{code}` redirect, the `/openapi.yaml` contract, and `/swagger` —
+is proxied through the public `web` domain. This topology is documented in the OpenAPI `info`
+description so anyone reading the spec understands the API isn't meant to be called directly.
 
 ## Testing
 

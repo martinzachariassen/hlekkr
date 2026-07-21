@@ -3,10 +3,6 @@
 // never reaches the browser. See the project README (Deployment).
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/+$/, "");
 
-// The API's own public origin — used for links that must NOT go through the key-injecting proxy:
-// the public Swagger UI (whose assets use absolute paths). Defaults to API_BASE for local dev.
-const PUBLIC_API_URL = (import.meta.env.VITE_PUBLIC_API_URL ?? API_BASE).replace(/\/+$/, "");
-
 export interface CreatedLink {
   code: string;
   shortUrl: string;
@@ -96,4 +92,6 @@ export async function deleteLink(code: string, token: string): Promise<void> {
   if (!res.ok) throw await toError(res);
 }
 
-export const apiDocsUrl = `${PUBLIC_API_URL}/swagger`;
+// Swagger UI is same-origin in production (Caddy proxies /swagger to the private API); in local dev
+// the API runs on its own origin, so point straight at it there.
+export const apiDocsUrl = /^https?:\/\//.test(API_BASE) ? `${API_BASE}/swagger` : "/swagger";
