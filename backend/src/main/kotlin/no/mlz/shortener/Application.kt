@@ -2,6 +2,7 @@ package no.mlz.shortener
 
 import no.mlz.shortener.config.AppConfig
 import no.mlz.shortener.plugins.configureCors
+import no.mlz.shortener.plugins.configureOpenApi
 import no.mlz.shortener.plugins.configureSerialization
 import no.mlz.shortener.plugins.configureStatusPages
 import no.mlz.shortener.repository.Database
@@ -26,21 +27,20 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 
-/** Everything the routing layer needs, assembled once at startup (or per test). */
 class AppComponents(
     val linkService: LinkService,
     val createLimiter: TokenBucketRateLimiter,
     val redirectLimiter: TokenBucketRateLimiter,
     val maxBodyBytes: Long,
+    val internalApiKey: String?,
 )
 
 fun main() {
     val config = AppConfig.load()
     val database = Database(config.db)
-    // In containers/production, migrations run as a separate privileged step (the Flyway service
-    // in docker-compose, or a deploy job) under the admin role — the app role has no DDL rights
-    // (§2.9). For local `./gradlew run` this defaults to true so a single command bootstraps the
-    // schema. See README §Database hardening.
+    // In production, migrations run as a separate privileged step under the admin role; the app
+    // role has no DDL rights. Defaults to on so local `./gradlew run` bootstraps the schema in
+    // one command. See README §Database hardening.
     if (System.getenv("RUN_MIGRATIONS_ON_STARTUP")?.toBoolean() != false) {
         database.migrate(
             migrationUser = System.getenv("DATABASE_MIGRATION_USER"),
@@ -54,15 +54,16 @@ fun main() {
     }.start(wait = true)
 }
 
-/**
- * Wires plugins, background workers, and routes. Takes a [LinkRepository] so tests can hand in
- * a Testcontainers-backed database while production hands in the pooled one from [main].
- */
+// Takes a [LinkRepository] so tests hand in a Testcontainers-backed database while production
+// hands in the pooled one from [main].
 fun Application.module(config: AppConfig, repository: LinkRepository) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val clickTracker = ClickTracker(repository, appScope).also { it.start() }
 
     val components = buildComponents(config, repository, clickTracker)
+    if (components.internalApiKey == null) {
+        environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
+    }
 
     install(CallId) {
         header("X-Correlation-Id")
@@ -73,6 +74,7 @@ fun Application.module(config: AppConfig, repository: LinkRepository) {
     configureSerialization()
     configureStatusPages()
     configureCors(config.app.allowedOrigins)
+    configureOpenApi()
 
     linkRoutes(components)
 
@@ -106,5 +108,6 @@ private fun buildComponents(
             refillPerMinute = config.app.rateLimit.redirect.refillPerMinute,
         ),
         maxBodyBytes = config.app.maxBodyBytes,
+        internalApiKey = config.app.internalApiKey,
     )
 }

@@ -3,14 +3,9 @@ package no.mlz.shortener.config
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
-/**
- * Typed application configuration.
- *
- * Non-secret defaults live in `application.conf` (committed). Secrets (DB credentials)
- * are injected from the environment via `${?VAR}` substitution and are validated here:
- * the server refuses to start if a required secret is missing or blank, so it can never
- * boot with a default/empty DB password.
- */
+// Non-secret defaults live in application.conf; secrets arrive via ${?VAR} env substitution.
+// load() fails fast if a required secret is missing, so the app can never boot with a blank
+// DB password.
 data class AppConfig(
     val server: ServerConfig,
     val app: AppSettings,
@@ -24,6 +19,8 @@ data class AppConfig(
         val allowedOrigins: List<String>,
         val rateLimit: RateLimitSettings,
         val code: CodeSettings,
+        // Blank when unset: management routes are then open (local dev). Set in production.
+        val internalApiKey: String?,
     )
 
     data class RateLimitSettings(
@@ -68,6 +65,7 @@ data class AppConfig(
                         length = config.getInt("app.code.length"),
                         maxAttempts = config.getInt("app.code.maxAttempts"),
                     ),
+                    internalApiKey = config.getString("app.internalApiKey").ifBlank { null },
                 ),
                 db = DbConfig(
                     url = config.getString("db.url"),

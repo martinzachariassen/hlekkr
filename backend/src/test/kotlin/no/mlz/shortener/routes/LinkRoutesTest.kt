@@ -68,7 +68,11 @@ class LinkRoutesTest {
         }
     }
 
-    private fun config(createCapacity: Long = 1000, redirectCapacity: Long = 1000) = AppConfig(
+    private fun config(
+        createCapacity: Long = 1000,
+        redirectCapacity: Long = 1000,
+        internalApiKey: String? = null,
+    ) = AppConfig(
         server = AppConfig.ServerConfig("0.0.0.0", 8080),
         app = AppConfig.AppSettings(
             baseUrl = "https://sho.rt",
@@ -79,6 +83,7 @@ class LinkRoutesTest {
                 redirect = AppConfig.BucketSettings(redirectCapacity, redirectCapacity),
             ),
             code = AppConfig.CodeSettings(length = 7, maxAttempts = 5),
+            internalApiKey = internalApiKey,
         ),
         db = AppConfig.DbConfig("unused", "unused", "unused", 1, 1000, 1000),
     )
@@ -226,6 +231,45 @@ class LinkRoutesTest {
         assertEquals("no-referrer", response.headers["Referrer-Policy"])
         assertEquals("default-src 'none'", response.headers["Content-Security-Policy"])
         assertNotNull(response.headers["Strict-Transport-Security"])
+    }
+
+    @Test
+    fun `management routes require the internal key when configured`() = appTest(config(internalApiKey = "s3cret")) {
+        val client = jsonClient()
+        fun postBody(): String = """{"targetUrl":"https://example.com"}"""
+
+        // Missing and wrong keys are indistinguishable from a genuine 404.
+        assertEquals(
+            HttpStatusCode.NotFound,
+            client.post("/links") { contentType(ContentType.Application.Json); setBody(postBody()) }.status,
+        )
+        assertEquals(
+            HttpStatusCode.NotFound,
+            client.post("/links") {
+                header("X-Internal-Key", "nope")
+                contentType(ContentType.Application.Json); setBody(postBody())
+            }.status,
+        )
+
+        val created = client.post("/links") {
+            header("X-Internal-Key", "s3cret")
+            contentType(ContentType.Application.Json); setBody(postBody())
+        }
+        assertEquals(HttpStatusCode.Created, created.status)
+
+        // The redirect stays public even when the key gate is on.
+        val code = created.body<CreateLinkResponse>().code
+        assertEquals(HttpStatusCode.Found, client.get("/$code").status)
+    }
+
+    @Test
+    fun `health and openapi spec are public`() = appTest(config(internalApiKey = "s3cret")) {
+        val client = jsonClient()
+        assertEquals(HttpStatusCode.OK, client.get("/health").status)
+
+        val spec = client.get("/openapi.yaml")
+        assertEquals(HttpStatusCode.OK, spec.status)
+        assertTrue(spec.bodyAsText().contains("openapi:"))
     }
 
     private suspend fun assertNoStackTrace(response: HttpResponse) {

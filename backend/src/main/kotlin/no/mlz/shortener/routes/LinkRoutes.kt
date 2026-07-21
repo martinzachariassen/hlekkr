@@ -1,6 +1,7 @@
 package no.mlz.shortener.routes
 
 import no.mlz.shortener.AppComponents
+import no.mlz.shortener.security.ServiceKey
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -10,6 +11,7 @@ import io.ktor.server.request.receiveStream
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -20,17 +22,21 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 
-/** Request body exceeded the configured cap (§2.1). Mapped to 413. */
+// Mapped to 413 in StatusPages.
 class PayloadTooLargeException : RuntimeException()
 
+private const val INTERNAL_KEY_HEADER = "X-Internal-Key"
 private val json = Json { ignoreUnknownKeys = true }
 
 fun Application.linkRoutes(components: AppComponents) {
     val service = components.linkService
 
     routing {
+        get("/health") { call.respondText("OK") }
+
+        // Management surface — only the frontend (holds the internal key) may reach these.
         post("/links") {
-            if (!allow(components, isCreate = true)) return@post
+            if (!fromFrontend(components) || !allow(components, isCreate = true)) return@post
             val request = receiveCreateRequest(components.maxBodyBytes)
             val result = service.createLink(request.targetUrl, request.expiresAt)
             call.respond(
@@ -40,6 +46,7 @@ fun Application.linkRoutes(components: AppComponents) {
         }
 
         get("/links/{code}/stats") {
+            if (!fromFrontend(components)) return@get
             val code = call.parameters["code"].orEmpty()
             val stats = service.stats(code, bearerToken())
             call.respond(
@@ -51,11 +58,13 @@ fun Application.linkRoutes(components: AppComponents) {
         }
 
         delete("/links/{code}") {
+            if (!fromFrontend(components)) return@delete
             val code = call.parameters["code"].orEmpty()
             service.delete(code, bearerToken())
             call.respond(HttpStatusCode.NoContent)
         }
 
+        // Public: the short link itself. Must stay reachable by anyone clicking it.
         get("/{code}") {
             if (!allow(components, isCreate = false)) return@get
             val code = call.parameters["code"].orEmpty()
@@ -65,7 +74,16 @@ fun Application.linkRoutes(components: AppComponents) {
     }
 }
 
-/** Applies the appropriate token bucket; on denial writes 429 + Retry-After and returns false. */
+// Rejects any caller lacking the configured internal key with a generic 404 (never revealing that
+// the route exists). Open when no key is configured, for local development.
+private suspend fun RoutingContext.fromFrontend(components: AppComponents): Boolean {
+    val expected = components.internalApiKey ?: return true
+    if (ServiceKey.matches(call.request.headers[INTERNAL_KEY_HEADER], expected)) return true
+    call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found", call.callId ?: "unknown"))
+    return false
+}
+
+// Applies the appropriate token bucket; on denial writes 429 + Retry-After and returns false.
 private suspend fun RoutingContext.allow(components: AppComponents, isCreate: Boolean): Boolean {
     val limiter = if (isCreate) components.createLimiter else components.redirectLimiter
     val decision = limiter.check(call.request.origin.remoteHost)
