@@ -4,8 +4,10 @@
 
 set -euo pipefail
 
-# Keep in sync with the `types` list in .github/workflows/ci.yml (pr-title job).
-types='feat|fix|docs|refactor|test|chore|perf|build|ci|style'
+# Allowed types come from the shared list (also read by the pr-title CI job), joined into a regex
+# alternation: feat|fix|docs|...
+types_file="$(dirname "$0")/commit-types.txt"
+types="$(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$types_file" | paste -sd '|' -)"
 
 subject="$(sed -n '/^[^#]/{p;q;}' "${1:?commit message file required}")"
 

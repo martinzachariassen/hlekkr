@@ -77,21 +77,24 @@ jobs:
     permissions:
       pull-requests: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Single source of truth, shared with the local commit-msg hook.
+      - id: types
+        run: |
+          {
+            echo 'list<<EOF'
+            grep -vE '^[[:space:]]*#|^[[:space:]]*$' scripts/ci/commit-types.txt
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          types: |
-            feat
-            fix
-            docs
-            refactor
-            test
-            chore
-            perf
-            build
-            ci
-            style
+          types: ${{ steps.types.outputs.list }}
           requireScope: false
           subjectPattern: ^.{1,72}$
           subjectPatternError: |
