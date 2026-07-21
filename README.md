@@ -176,14 +176,16 @@ CORS alone would leave `POST /links` open to the world. So the real gate is a **
 key**: the management routes require an `X-Internal-Key` header whose value only the frontend
 knows, checked in constant time, with a miss returning the same generic `404` as everything else.
 
-The key belongs to the frontend's **server**, never the browser. The browser talks to the
-frontend's own backend (a Next.js route handler / BFF, say), which injects the key and proxies to
-this API. The secret never ships to the client.
+The key belongs to the frontend's **server**, never the browser. Here that server is the
+[Caddy](https://caddyserver.com) proxy in front of the web app (`frontend/Caddyfile`): the browser
+calls `/api/*` same-origin, Caddy injects `X-Internal-Key` and proxies to this API over Railway's
+private network. The secret never ships to the client — and because the calls are same-origin, no
+CORS is involved at all.
 
 ```
-Browser ──> Frontend server (holds INTERNAL_API_KEY) ──X-Internal-Key──> Shortener API
-                                                                            /links*  key required
-Anyone ─────────────────────────────────────────────────────────────────> GET /{code}  public
+Browser ──/api/*──> Caddy (holds INTERNAL_API_KEY) ──X-Internal-Key──> Shortener API
+                                                                         /links*  key required
+Anyone ────────────────────────────────────────────────────────────────> GET /{code}  public
 ```
 
 This composes with the existing per-link owner token to give two independent layers: the service
@@ -196,7 +198,9 @@ startup) so development stays friction-free.
 A single-screen web client (Vite + React + TypeScript) lives in [`frontend/`](frontend): paste a
 URL to get a short one plus a one-time owner key, then look a link up by code + key to see clicks
 or delete it. The whole thing fits one non-scrolling screen — result and stats states swap in
-place. The theme (warm paper, teal accent, mono-first type) borrows from [mlz.no](https://mlz.no).
+place. The palette (warm paper, teal accent) borrows from [mlz.no](https://mlz.no); the body type is
+[Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), designed for legibility, paired
+with Instrument Serif for the headline.
 
 Privacy is the pitch, so analytics is opt-in: it integrates [Umami](https://umami.is) (cookieless),
 but ships **zero** analytics code unless `VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID` are set. See
@@ -233,27 +237,45 @@ Both `mise run dev` and `make run` run the API from source with migrations appli
 
 ## Deploying to Railway
 
-The backend deploys as a single Railway service from `backend/Dockerfile` (`backend/railway.toml`
-sets the builder and the `/health` check — point the service's root directory at `backend`).
-Configure it as follows:
+Two Railway services from this one repo — each has its own `railway.toml` and `Dockerfile`; set each
+service's **root directory** accordingly:
+
+```
+                        ┌───────────────────────────── Railway ─────────────────────────────┐
+Visitor ──/api/*──▶ web (Caddy)  ──X-Internal-Key──▶  api (Ktor)  ◀──▶  Postgres
+          static ◀──  root: frontend    private net    root: backend        plugin
+Visitor ──short link──────────────────────────────▶  api  GET /{code}  (public redirect)
+                        └────────────────────────────────────────────────────────────────────┘
+```
+
+**`api` service** (root directory `backend`) — serves the public redirects and the gated management
+API:
 
 - **Postgres** — add a Railway Postgres plugin and set `DATABASE_URL`, `DATABASE_USER`,
   `DATABASE_PASSWORD`. For least privilege, run migrations under an admin role and let the app
-  connect as a DML-only role; the simplest single-service option is to set
-  `RUN_MIGRATIONS_ON_STARTUP=true` with `DATABASE_MIGRATION_USER` / `DATABASE_MIGRATION_PASSWORD`
-  pointing at the privileged role, so the schema is applied on boot and the app then serves under
-  the restricted role.
-- **`INTERNAL_API_KEY`** — set a long random value (`openssl rand -base64 32`). Add the *same*
-  value to the frontend service (Railway shared variables make this one definition) and have the
-  frontend's server send it as `X-Internal-Key`. This is what locks the management API to your
-  frontend.
-- **`BASE_URL`** — the API's public URL, used to build `shortUrl`s and to reject self-referential
-  targets. **`CORS_ALLOWED_ORIGINS`** — your frontend's origin, as defense-in-depth for browsers.
-- **Want the management API completely off the public internet?** Give this service *no* public
-  domain and put a thin public redirect service in front, then have the frontend reach the
-  management API over Railway's private network (`*.railway.internal`). That is stronger isolation
-  at the cost of a second service; the service-key gate above is the pragmatic single-service
-  equivalent and still applies.
+  connect as a DML-only role: set `RUN_MIGRATIONS_ON_STARTUP=true` with `DATABASE_MIGRATION_USER` /
+  `DATABASE_MIGRATION_PASSWORD` pointing at the privileged role, so the schema is applied on boot
+  and the app then serves under the restricted role.
+- **`INTERNAL_API_KEY`** — a long random value (`openssl rand -base64 32`); set the *same* value on
+  the `web` service so Caddy can inject it. This is what locks the management API to your frontend.
+- **`BASE_URL`** — this service's own public URL, used to build `shortUrl`s and to reject
+  self-referential targets.
+- **`TRUST_PROXY_HEADERS=true`** — so per-IP rate limiting reads the real client IP from
+  `X-Forwarded-For` (Railway's edge sets it) instead of bucketing every visitor together.
+- **`CORS_ALLOWED_ORIGINS`** — leave empty. The frontend calls the API same-origin through the proxy,
+  so no cross-origin access is needed.
+
+**`web` service** (root directory `frontend`) — Caddy serving the static bundle and proxying `/api/*`:
+
+- **`API_UPSTREAM=api.railway.internal:8080`** — the `api` service over Railway's private network.
+- **`INTERNAL_API_KEY`** — the same value as on `api`; Caddy injects it as `X-Internal-Key`.
+- **`VITE_PUBLIC_API_URL`** — the `api` service's public URL (used for the Swagger link, which skips
+  the proxy). **`VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID`** — optional; omit to ship zero analytics.
+  These three are read at *build* time (Vite inlines them), which Railway passes as Docker build args.
+
+The management API is reachable publicly on the `api` domain too, but every management route is gated
+by `INTERNAL_API_KEY` (a miss is an indistinguishable `404`), so only the proxy — which holds the key
+— can use it. The redirect endpoint stays public by design.
 
 ## Testing
 
@@ -287,7 +309,9 @@ JVM target 25). It should be added once the tooling catches up, or by pinning an
 
 - **Multi-instance rate limiting.** The token bucket is in-memory, so limits are per-instance.
   Correct behind a single instance; a horizontally-scaled deployment would move the buckets to
-  Redis. Kept in-memory here to avoid a second piece of infrastructure for a demo.
+  Redis. Kept in-memory here to avoid a second piece of infrastructure for a demo. The map is
+  bounded — buckets that have refilled to full are evicted once it grows large — so churning/spoofed
+  source IPs can't grow it without limit.
 - **Click analytics beyond a count.** `clicks` stores only `link_id` and a timestamp — no IP,
   user-agent, or referrer. Collecting those would make this a tracking product and add a
   privacy-compliance surface that isn't the point. A crash between enqueue and flush can lose at
