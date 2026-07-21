@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "short — a link shortener that doesn't track you",
+  "short_name": "short",
+  "description": "Paste a URL, get a short one back. No accounts, no logins — clicks are counted, never profiled.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ecebe4",
+  "theme_color": "#ecebe4",
+  "icons": [
+    { "src": "/assets/icons/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icons/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
