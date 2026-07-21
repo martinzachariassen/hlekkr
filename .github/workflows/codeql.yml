@@ -1,0 +1,54 @@
+name: CodeQL
+
+# Static application security testing for the frontend. CodeQL's JavaScript/TypeScript
+# analyzer works on the current toolchain and uploads findings to the Security tab
+# (code scanning).
+#
+# Scope is deliberately javascript-typescript ONLY: the Kotlin backend's SAST is still
+# deferred because CodeQL's Kotlin extractor sees "no source" on the pinned JDK 25 +
+# Kotlin 2.4 toolchain (see README §Static analysis). Add a `kotlin` language here once
+# the extractor supports that toolchain.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/codeql.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/codeql.yml"
+  schedule:
+    - cron: "23 5 * * 1" # Mondays 05:23 UTC — off-peak, staggered from the other weekly jobs.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Needed to upload results to the code-scanning dashboard.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # No build needed for JS/TS; CodeQL analyses the source directly.
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
