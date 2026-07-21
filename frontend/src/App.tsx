@@ -20,7 +20,7 @@ export function App() {
   return (
     <div className="page">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="short — home">
+        <a className="brand" href="/" aria-label="short — home" data-umami-event="open-home">
           <span className="brand-mark" aria-hidden="true" />
           short
         </a>
@@ -173,7 +173,13 @@ function ResultPanel({
 
       <div className="panel result" aria-live="polite">
         <div className="result-row">
-          <a className="result-url" href={link.shortUrl} target="_blank" rel="noopener">
+          <a
+            className="result-url"
+            href={link.shortUrl}
+            target="_blank"
+            rel="noopener"
+            data-umami-event="open-short-link"
+          >
             {link.shortUrl}
           </a>
           <CopyButton value={link.shortUrl} label="Copy" event="copy-link" />
@@ -331,7 +337,12 @@ function StatsPanel({ stats, busy, onDelete }: { stats: Stats; busy: boolean; on
             <button type="button" className="btn danger" disabled={busy} onClick={onDelete} data-umami-event="delete-confirm">
               Yes, delete
             </button>
-            <button type="button" className="linklike" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              className="linklike"
+              onClick={() => setConfirming(false)}
+              data-umami-event="delete-cancel"
+            >
               Cancel
             </button>
           </>
