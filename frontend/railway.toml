@@ -1,0 +1,16 @@
+# Railway deploy config for the web service (static site + API proxy). In the Railway dashboard, set
+# this service's root directory to `frontend` so this file and the Dockerfile are picked up.
+#
+# Required variables (see Caddyfile + Dockerfile):
+#   API_UPSTREAM=api.railway.internal:8080   INTERNAL_API_KEY=<same as the API service>
+#   VITE_PUBLIC_API_URL=<the API service's public URL>
+#   VITE_UMAMI_SRC / VITE_UMAMI_WEBSITE_ID   (optional; omit to ship zero analytics)
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

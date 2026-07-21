@@ -1,0 +1,40 @@
+# Serves the built SPA and reverse-proxies the gated management API to the backend over Railway's
+# private network, injecting X-Internal-Key server-side so it never reaches the browser. Because the
+# app and its /api calls are then same-origin, the backend needs no CORS at all.
+#
+# Env (set as Railway service variables):
+#   PORT              - listen port (Railway sets this automatically)
+#   API_UPSTREAM      - backend address, e.g. api.railway.internal:8080
+#   INTERNAL_API_KEY  - shared secret; must match the backend's INTERNAL_API_KEY
+#   UMAMI_HOST        - analytics origin allowed by the CSP (default: https://cloud.umami.is)
+
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:{$PORT:8080} {
+	encode zstd gzip
+	root * /srv
+
+	handle_path /api/* {
+		reverse_proxy {$API_UPSTREAM} {
+			header_up X-Internal-Key {$INTERNAL_API_KEY}
+		}
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+
+		header {
+			-Server
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+			Content-Security-Policy "default-src 'none'; script-src 'self' {$UMAMI_HOST:https://cloud.umami.is}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' {$UMAMI_HOST:https://cloud.umami.is}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		}
+	}
+}

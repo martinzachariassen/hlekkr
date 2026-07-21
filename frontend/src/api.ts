@@ -1,8 +1,11 @@
+// Gated management calls (create/stats/delete). Dev: straight to the local API. Prod: "/api", so
+// they go same-origin through the Caddy proxy, which injects the internal key server-side — the key
+// never reaches the browser. See the project README (Deployment).
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/+$/, "");
 
-// Only set for a direct-to-API deployment that enforces INTERNAL_API_KEY. In production this key
-// belongs on a server-side proxy, not in the browser bundle — see the project README.
-const INTERNAL_KEY = import.meta.env.VITE_INTERNAL_KEY ?? "";
+// The API's own public origin — used for links that must NOT go through the key-injecting proxy:
+// the public Swagger UI (whose assets use absolute paths). Defaults to API_BASE for local dev.
+const PUBLIC_API_URL = (import.meta.env.VITE_PUBLIC_API_URL ?? API_BASE).replace(/\/+$/, "");
 
 export interface CreatedLink {
   code: string;
@@ -21,9 +24,7 @@ export interface Stats {
 }
 
 function headers(extra?: Record<string, string>): Record<string, string> {
-  const h: Record<string, string> = { "Content-Type": "application/json", ...extra };
-  if (INTERNAL_KEY) h["X-Internal-Key"] = INTERNAL_KEY;
-  return h;
+  return { "Content-Type": "application/json", ...extra };
 }
 
 // The API never leaks internals; map its status codes to something a person can act on.
@@ -95,4 +96,4 @@ export async function deleteLink(code: string, token: string): Promise<void> {
   if (!res.ok) throw await toError(res);
 }
 
-export const apiDocsUrl = `${API_BASE}/swagger`;
+export const apiDocsUrl = `${PUBLIC_API_URL}/swagger`;
