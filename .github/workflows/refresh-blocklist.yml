@@ -1,0 +1,65 @@
+name: Refresh blocklist
+
+# The content denylist (adult + malware target domains) is fetched at Docker build time and baked
+# into the image (see backend/Dockerfile), so it is only ever as fresh as the last deploy. This job
+# runs weekly and:
+#   1. re-fetches both upstream lists and fails LOUDLY if either 404s or comes back suspiciously
+#      small — an early warning that an upstream URL rotted (as HaGeZi's once did), instead of the
+#      build silently baking an empty list;
+#   2. bumps backend/.blocklist-epoch, which busts the Dockerfile fetch-layer cache. Railway
+#      auto-deploys the push and rebuilds with freshly-downloaded lists.
+# No secrets, no runtime network dependency. Assumes Railway auto-deploy on push to the deploy branch.
+on:
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC — off-peak, and off the top of the hour.
+  workflow_dispatch: {}
+
+# Least privilege: only the commit/push below needs write.
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-blocklist
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keep these URLs in sync with backend/Dockerfile's blocklist stage.
+      - name: Fetch and sanity-check upstream lists
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-all-errors --max-time 60 \
+            https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw-onlydomains.txt \
+            -o nsfw.txt
+          curl -fsSL --retry 5 --retry-all-errors --max-time 60 \
+            https://urlhaus.abuse.ch/downloads/hostfile/ \
+            -o malware.txt
+          nsfw=$(grep -vcE '^\s*(#|$)' nsfw.txt || true)
+          malware=$(grep -vcE '^\s*(#|$)' malware.txt || true)
+          echo "nsfw=$nsfw malware=$malware"
+          # Floors guard against a 200-but-empty or reformatted feed slipping through curl -f.
+          test "$nsfw" -ge 50000
+          test "$malware" -ge 1
+
+      - name: Bump epoch marker
+        run: |
+          date -u +%Y-%m-%dT%H:%MZ > backend/.blocklist-epoch
+          echo "epoch = $(cat backend/.blocklist-epoch)"
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- backend/.blocklist-epoch; then
+            echo "Marker unchanged (same minute); nothing to push."
+            exit 0
+          fi
+          git add backend/.blocklist-epoch
+          git commit -m "chore(blocklist): refresh content denylist"
+          git push
