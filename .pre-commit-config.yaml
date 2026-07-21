@@ -1,0 +1,51 @@
+# Local pre-commit hooks. All use language: system so they run tools you already
+# have installed (brew/mise), not managed copies.
+# Activate:  pre-commit install --install-hooks
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, commit-msg]
+
+fail_fast: false
+
+repos:
+  - repo: local
+    hooks:
+      # Enforce Conventional Commits for direct commits (CI also checks PR titles).
+      - id: conventional-commit
+        name: Conventional Commits subject
+        stages: [commit-msg]
+        entry: bash scripts/ci/check-commit-msg.sh
+        language: system
+
+      - id: shellcheck
+        name: shellcheck (severity=error)
+        entry: shellcheck --severity=error --shell=bash
+        language: system
+        files: '^(scripts/.*\.sh|docker/.*\.sh)$'
+
+      - id: typos
+        name: typos
+        entry: typos
+        language: system
+        pass_filenames: false
+
+      - id: gitleaks
+        name: gitleaks (secret scan)
+        entry: gitleaks dir . --redact --no-banner
+        language: system
+        pass_filenames: false
+
+      - id: actionlint
+        name: actionlint (workflow lint)
+        entry: actionlint
+        language: system
+        pass_filenames: false
+        files: '^\.github/workflows/.*\.ya?ml$'
+
+      # Kotlin: fail the commit on a compile or test break. Heavier than the other
+      # hooks, so it only runs when Kotlin/Gradle files actually change.
+      - id: gradle-test
+        name: gradle build + test
+        entry: bash -c 'cd backend && ./gradlew build --no-daemon'
+        language: system
+        pass_filenames: false
+        files: '^backend/(src/.*|build\.gradle\.kts|settings\.gradle\.kts|gradle/.*)$'

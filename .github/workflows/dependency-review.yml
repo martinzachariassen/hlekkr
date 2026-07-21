@@ -1,0 +1,30 @@
+name: Dependency Review
+
+# Blocks a PR that pulls in a dependency with a known vulnerability (or an
+# incompatible licence) *before* it lands. Dependabot only reacts after a bad
+# version is already on main; CodeQL scans our code, not the dependency graph —
+# this closes that gap on the PR itself.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dep-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: review dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure

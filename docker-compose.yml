@@ -1,0 +1,63 @@
+# Local development stack: Postgres 18 + the API.
+# Copy .env.example to .env first (real secrets never live in this file).
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD}
+      # Consumed by the init script to create the least-privilege app role.
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ stores data in a version subdirectory; mount the parent, not /data.
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_ADMIN_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Migrations run as a discrete step under the privileged admin role (§2.9), before the app
+  # starts. The app role has DML only and cannot run DDL.
+  flyway:
+    image: flyway/flyway:11-alpine
+    command: >-
+      -url=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      -user=${DB_ADMIN_USER}
+      -password=${DB_ADMIN_PASSWORD}
+      -connectRetries=10
+      -locations=filesystem:/flyway/sql
+      migrate
+    volumes:
+      - ./backend/src/main/resources/db/migration:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      DATABASE_USER: ${APP_DB_USER}
+      DATABASE_PASSWORD: ${APP_DB_PASSWORD}
+      # Schema is already migrated by the flyway service; the app must not (and cannot) do DDL.
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+      BASE_URL: ${BASE_URL}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
