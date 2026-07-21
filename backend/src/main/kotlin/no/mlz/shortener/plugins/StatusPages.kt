@@ -16,11 +16,8 @@ import io.ktor.server.response.respond
 import kotlinx.serialization.SerializationException
 import org.slf4j.LoggerFactory
 
-/**
- * Single place that turns exceptions into responses (§2.7). Clients only ever see a clean
- * status, a generic (or explicitly client-safe) message, and a correlation id. Raw exception
- * messages, stack traces, and SQL error text are logged server-side and never serialized out.
- */
+// The only place exceptions become responses. Clients see a clean status, a client-safe message,
+// and a correlation id; raw messages, stack traces, and SQL text stay in the server logs.
 fun Application.configureStatusPages() {
     val log = LoggerFactory.getLogger("StatusPages")
 
@@ -32,7 +29,6 @@ fun Application.configureStatusPages() {
             if (status == HttpStatusCode.InternalServerError) {
                 log.error("Unhandled error [{}]", correlationId, cause)
             } else {
-                // Expected 4xx: log at INFO without a stack trace, but keep the real reason server-side.
                 log.info("Request rejected [{}]: {} -> {}", correlationId, cause.javaClass.simpleName, status.value)
             }
 

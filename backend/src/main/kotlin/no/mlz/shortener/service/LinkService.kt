@@ -14,12 +14,8 @@ data class CreateLinkResult(val code: String, val shortUrl: String, val ownerTok
 
 data class StatsResult(val totalClicks: Long, val last7Days: List<DailyClickCount>)
 
-/**
- * Orchestrates the link lifecycle: validate -> generate code -> hash owner token -> persist,
- * plus authenticated stats/delete. All 404-worthy conditions (missing, expired, deleted, or
- * failed owner-token auth) surface as the same [LinkNotFoundException] so callers can't probe
- * link existence (§2.3, §2.7).
- */
+// Missing, expired, deleted, and failed owner-token auth all surface as the same
+// LinkNotFoundException so callers can't probe which links exist.
 class LinkService(
     private val repository: LinkRepository,
     private val urlValidator: UrlValidator,
@@ -42,13 +38,12 @@ class LinkService(
                 repository.insert(code, targetUrl, ownerTokenHash, expiresAt)
                 return CreateLinkResult(code, "$baseUrl/$code", ownerToken)
             } catch (_: DuplicateCodeException) {
-                // Collision — try a fresh code. Fail closed once attempts are exhausted.
+                // Collision — try a fresh code; fail closed once attempts are exhausted.
             }
         }
         throw CodeGenerationException()
     }
 
-    /** Resolves a code to its target and records the click asynchronously. */
     fun resolveAndTrack(code: String): String {
         val link = repository.findLive(code) ?: throw LinkNotFoundException()
         clickTracker.record(link.id)

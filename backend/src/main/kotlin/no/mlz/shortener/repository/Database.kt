@@ -9,12 +9,9 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import javax.sql.DataSource
 
-/**
- * Owns the application's HikariCP pool and exposes tiny, hand-written query helpers.
- *
- * There is no ORM: every statement is a [PreparedStatement] with bound parameters
- * (see [Connection.query] / [Connection.update]). Nothing interpolates user input into SQL.
- */
+// Owns the HikariCP pool and hand-written query helpers. No ORM: every statement is a
+// PreparedStatement with bound params (see Connection.query / update) — nothing interpolates
+// user input into SQL.
 class Database(dbConfig: AppConfig.DbConfig) : AutoCloseable {
 
     val dataSource: HikariDataSource = HikariDataSource(
@@ -25,21 +22,16 @@ class Database(dbConfig: AppConfig.DbConfig) : AutoCloseable {
             maximumPoolSize = dbConfig.maxPoolSize
             connectionTimeout = dbConfig.connectionTimeoutMs
             poolName = "shortener-pool"
-            // A runaway query cannot pin a connection forever: bound every statement server-side.
+            // Bound every statement server-side so a runaway query can't pin a connection forever.
             connectionInitSql = "SET statement_timeout = ${dbConfig.statementTimeoutMs}"
         },
     )
 
-    /**
-     * Applies Flyway migrations. Migrations should run under a privileged role that can create
-     * tables; the app's [dataSource] is a least-privilege role that only has DML (§2.9). Pass
-     * [migrationUser]/[migrationPassword] to migrate under that separate role (this is what
-     * Docker Compose and CI do). When absent, migrations reuse the app datasource — convenient
-     * for local `./gradlew run` and documented as such in the README.
-     */
+    // The app dataSource is a DML-only role that can't create tables, so migrations run under a
+    // separate privileged role when its credentials are supplied. When absent they reuse the app
+    // datasource — convenient for local `./gradlew run`.
     fun migrate(migrationUser: String? = null, migrationPassword: String? = null) {
         if (migrationUser != null && migrationPassword != null) {
-            // Short-lived pool under the privileged role, closed as soon as migration finishes.
             migrationDataSource(migrationUser, migrationPassword).use { runFlyway(it) }
         } else {
             runFlyway(dataSource)
@@ -55,7 +47,7 @@ class Database(dbConfig: AppConfig.DbConfig) : AutoCloseable {
     }
 
     private fun migrationDataSource(user: String, password: String): HikariDataSource {
-        val appJdbcUrl = dataSource.jdbcUrl // capture before apply: HikariConfig has its own `dataSource`
+        val appJdbcUrl = dataSource.jdbcUrl // capture before apply {}: HikariConfig shadows `dataSource`
         return HikariDataSource(
             HikariConfig().apply {
                 jdbcUrl = appJdbcUrl
@@ -77,7 +69,6 @@ private fun PreparedStatement.bindAll(params: Array<out Any?>) {
     params.forEachIndexed { index, value -> setObject(index + 1, value) }
 }
 
-/** Runs a parameterized SELECT and maps every row. */
 fun <T> Connection.query(sql: String, vararg params: Any?, map: (ResultSet) -> T): List<T> =
     prepareStatement(sql).use { stmt ->
         stmt.bindAll(params)
@@ -86,20 +77,17 @@ fun <T> Connection.query(sql: String, vararg params: Any?, map: (ResultSet) -> T
         }
     }
 
-/** Runs a parameterized SELECT and maps the first row, or null. */
 fun <T> Connection.queryOne(sql: String, vararg params: Any?, map: (ResultSet) -> T): T? =
     prepareStatement(sql).use { stmt ->
         stmt.bindAll(params)
         stmt.executeQuery().use { rs -> if (rs.next()) map(rs) else null }
     }
 
-/** Runs a parameterized INSERT/UPDATE/DELETE and returns the affected row count. */
 fun Connection.update(sql: String, vararg params: Any?): Int =
     prepareStatement(sql).use { stmt ->
         stmt.bindAll(params)
         stmt.executeUpdate()
     }
 
-/** Convenience for callers that only have a [DataSource]. */
 fun <T> DataSource.withConnection(block: (Connection) -> T): T =
     connection.use(block)

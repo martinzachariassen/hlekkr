@@ -5,14 +5,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 import kotlin.math.min
 
-/**
- * In-memory, per-key token-bucket rate limiter (§2.4).
- *
- * `capacity` is the burst size; `refillPerMinute` is the sustained rate. State lives in a
- * [ConcurrentHashMap] keyed by client IP. This is single-instance only: it does NOT survive
- * horizontal scaling — a multi-instance deployment would move this to Redis (documented in
- * the README). A clock function is injected so the refill logic is deterministically testable.
- */
+// In-memory, per-IP token bucket: `capacity` = burst, `refillPerMinute` = sustained rate. State is
+// single-instance and does NOT survive horizontal scaling — a scaled deployment moves this to
+// Redis. `nanoTime` is injected so refill logic is deterministically testable.
 class TokenBucketRateLimiter(
     private val capacity: Long,
     refillPerMinute: Long,

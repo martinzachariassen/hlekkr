@@ -4,19 +4,10 @@ import java.net.InetAddress
 import java.net.URI
 import java.net.URISyntaxException
 
-/**
- * Validates a user-supplied target URL before it is ever stored (§2.1).
- *
- * This service never fetches the target today, so none of these checks are load-bearing
- * for SSRF *yet*. They exist so that adding a preview/screenshot feature later cannot
- * silently open an SSRF hole — the rejection of loopback/private/metadata hosts is a
- * deliberate, documented precaution (see README).
- *
- * DNS is intentionally NOT resolved here: we validate the literal host only. Resolving at
- * creation time would add nondeterminism and its own lookup surface, and would still be
- * stale by fetch time — so any future fetch feature must re-validate the resolved address
- * at fetch time regardless.
- */
+// Rejecting loopback/private/metadata hosts is SSRF-preventive: this service doesn't fetch targets
+// today, but the checks mean adding a preview/screenshot feature later can't silently open a hole.
+// DNS is deliberately NOT resolved — only the literal host is validated; a future fetch must
+// re-validate the resolved address then, since it can change between now and fetch time.
 class UrlValidator(baseUrl: String) {
 
     private val selfHost: String = runCatching { URI(baseUrl).host }
@@ -74,7 +65,7 @@ class UrlValidator(baseUrl: String) {
     private fun isBlockedHostname(host: String): Boolean =
         host == "localhost" || host.endsWith(".localhost")
 
-    /** Parses [host] as an IP literal WITHOUT triggering DNS; returns null for hostnames. */
+    // Parses an IP literal without triggering DNS; null for hostnames.
     private fun asIpLiteral(host: String): InetAddress? {
         val looksLikeIp = host.contains(':') || IPV4_LITERAL.matches(host)
         if (!looksLikeIp) return null

@@ -3,7 +3,6 @@ package no.mlz.shortener.repository
 import java.time.LocalDate
 import java.time.OffsetDateTime
 
-/** A live link row. */
 data class LinkRecord(
     val id: Long,
     val code: String,
@@ -13,16 +12,12 @@ data class LinkRecord(
     val expiresAt: OffsetDateTime?,
 )
 
-/** One day's click count, for the stats endpoint. */
 data class DailyClickCount(val date: LocalDate, val count: Long)
 
-/** Raised when a code collides with an existing row on insert (SQLSTATE 23505). */
+// Code collided with an existing row on insert (SQLSTATE 23505).
 class DuplicateCodeException : RuntimeException()
 
-/**
- * All persistence for links and clicks. Every method uses a [java.sql.PreparedStatement]
- * with bound parameters — no user input is ever concatenated or interpolated into SQL.
- */
+// Every method binds parameters via PreparedStatement — no user input is concatenated into SQL.
 class LinkRepository(private val database: Database) {
 
     fun insert(
@@ -43,7 +38,6 @@ class LinkRepository(private val database: Database) {
         }
     }
 
-    /** Looks up a link that is not deleted and not expired. Everything else is 404 to callers. */
     fun findLive(code: String): LinkRecord? = database.withConnection { conn ->
         conn.queryOne(
             "SELECT id, code, target_url, owner_token_hash, created_at, expires_at " +
@@ -54,7 +48,6 @@ class LinkRepository(private val database: Database) {
         )
     }
 
-    /** Soft-deletes a live link; returns true if a row transitioned to deleted. */
     fun softDelete(code: String): Boolean = database.withConnection { conn ->
         conn.update(
             "UPDATE links SET deleted_at = now() WHERE code = ? AND deleted_at IS NULL",
@@ -62,7 +55,6 @@ class LinkRepository(private val database: Database) {
         ) > 0
     }
 
-    /** Batch-records click events. Called only by the background [ClickTracker] consumer. */
     fun recordClicks(linkIds: List<Long>) {
         if (linkIds.isEmpty()) return
         database.withConnection { conn ->
@@ -84,7 +76,7 @@ class LinkRepository(private val database: Database) {
         ) ?: 0L
     }
 
-    /** Daily click counts (UTC) for the last 7 days, ascending. Days with zero clicks are absent. */
+    // Ascending, UTC; days with zero clicks are simply absent.
     fun clicksLast7Days(linkId: Long): List<DailyClickCount> = database.withConnection { conn ->
         conn.query(
             "SELECT (clicked_at AT TIME ZONE 'UTC')::date AS d, count(*) AS c " +

@@ -11,17 +11,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 
-/**
- * Records redirect clicks off the hot path (§6).
- *
- * The redirect handler calls [record], which never blocks: the link id is dropped onto a
- * bounded [Channel] and a single background coroutine batches inserts (flush at
- * [batchSize] events or every [flushIntervalMs] ms, whichever comes first).
- *
- * Tradeoff: a crash between enqueue and flush loses at most one un-flushed batch of click
- * counts. That is acceptable for analytics; it would NOT be acceptable for billing-grade data.
- * Under sustained overflow the oldest queued events are dropped rather than blocking redirects.
- */
+// Keeps click writes off the redirect hot path: record() drops the id on a bounded channel and a
+// single background coroutine batches inserts. A crash between enqueue and flush loses at most one
+// un-flushed batch — fine for analytics counts, not for billing-grade data. Under sustained
+// overflow the oldest queued events are dropped rather than blocking redirects.
 class ClickTracker(
     private val repository: LinkRepository,
     private val scope: CoroutineScope,
@@ -42,7 +35,6 @@ class ClickTracker(
         consumer = scope.launch { consume() }
     }
 
-    /** Enqueue a click for [linkId]. Non-blocking and best-effort. */
     fun record(linkId: Long) {
         channel.trySend(linkId)
     }
@@ -52,8 +44,7 @@ class ClickTracker(
         while (true) {
             val first = channel.receiveCatching().getOrNull() ?: break
             buffer.add(first)
-            // Fill the batch until it's full or the flush window elapses. receiveCatching lets the
-            // channel close mid-fill (on shutdown) without throwing — we just flush what we have.
+            // receiveCatching lets the channel close mid-fill (on shutdown) without throwing.
             withTimeoutOrNull(flushIntervalMs) {
                 while (buffer.size < batchSize) {
                     val next = channel.receiveCatching().getOrNull() ?: return@withTimeoutOrNull
@@ -75,7 +66,7 @@ class ClickTracker(
         }
     }
 
-    /** Stops accepting clicks and lets the consumer drain what is already queued. */
+    // Stops accepting clicks and drains what is already queued.
     suspend fun close() {
         channel.close()
         consumer?.join()
