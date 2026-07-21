@@ -2,20 +2,14 @@
 # have installed (brew/mise), not managed copies.
 # Activate:  pre-commit install --install-hooks
 minimum_pre_commit_version: "3.5.0"
-default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_install_hook_types: [pre-commit, pre-push]
 
 fail_fast: false
 
 repos:
   - repo: local
     hooks:
-      # Enforce Conventional Commits for direct commits (CI also checks PR titles).
-      - id: conventional-commit
-        name: Conventional Commits subject
-        stages: [commit-msg]
-        entry: bash scripts/ci/check-commit-msg.sh
-        language: system
-
+      # Conventional Commits are enforced on the PR title in CI (the squash-merge subject).
       - id: shellcheck
         name: shellcheck (severity=error)
         entry: shellcheck --severity=error --shell=bash
