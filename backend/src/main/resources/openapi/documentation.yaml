@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: URL Shortener API
+  version: 1.0.0
+  description: >
+    A security-hardened URL shortener. Creating and managing links is restricted to the
+    trusted frontend via an internal service key (`X-Internal-Key`); each link additionally
+    carries a one-time owner token used to read its stats or delete it. The redirect endpoint
+    is public — it is the short link itself.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Links
+    description: Create and manage short links (frontend-only)
+  - name: Redirect
+    description: Public short-link resolution
+  - name: Ops
+    description: Operational endpoints
+
+paths:
+  /links:
+    post:
+      tags: [Links]
+      summary: Create a short link
+      description: >
+        Validates the target URL, allocates a random non-enumerable code, and returns the
+        short URL together with a one-time owner token. The owner token is shown exactly once
+        and is required to view stats or delete the link later.
+      security:
+        - internalKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLinkRequest'
+            examples:
+              minimal:
+                value: { targetUrl: "https://example.com/some/long/path" }
+              withExpiry:
+                value: { targetUrl: "https://example.com", expiresAt: "2030-01-01T00:00:00Z" }
+      responses:
+        '201':
+          description: Link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateLinkResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /links/{code}/stats:
+    get:
+      tags: [Links]
+      summary: Get click statistics for a link
+      security:
+        - internalKey: []
+          ownerToken: []
+      parameters:
+        - $ref: '#/components/parameters/Code'
+      responses:
+        '200':
+          description: Click statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /links/{code}:
+    delete:
+      tags: [Links]
+      summary: Delete a link
+      description: Soft-deletes the link. Idempotent from the caller's perspective.
+      security:
+        - internalKey: []
+          ownerToken: []
+      parameters:
+        - $ref: '#/components/parameters/Code'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /{code}:
+    get:
+      tags: [Redirect]
+      summary: Resolve a short link
+      description: >
+        Public. Redirects to the target URL and records the click asynchronously. Missing,
+        expired, and deleted codes all return a generic 404.
+      parameters:
+        - $ref: '#/components/parameters/Code'
+      responses:
+        '302':
+          description: Redirect to the target URL
+          headers:
+            Location:
+              schema: { type: string }
+              description: The target URL
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /health:
+    get:
+      tags: [Ops]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service is up
+          content:
+            text/plain:
+              schema: { type: string, example: OK }
+
+components:
+  securitySchemes:
+    internalKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Key
+      description: Shared secret proving the caller is the trusted frontend. Held server-side only.
+    ownerToken:
+      type: http
+      scheme: bearer
+      description: The one-time token returned when the link was created.
+
+  parameters:
+    Code:
+      name: code
+      in: path
+      required: true
+      schema: { type: string, example: d10ndrX }
+      description: The short code.
+
+  schemas:
+    CreateLinkRequest:
+      type: object
+      required: [targetUrl]
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: Absolute http/https URL. Private, loopback, and metadata hosts are rejected.
+          example: https://example.com/some/long/path
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional ISO-8601 instant in the future.
+          example: "2030-01-01T00:00:00Z"
+
+    CreateLinkResponse:
+      type: object
+      required: [code, shortUrl, ownerToken]
+      properties:
+        code: { type: string, example: d10ndrX }
+        shortUrl: { type: string, format: uri, example: https://sho.rt/d10ndrX }
+        ownerToken:
+          type: string
+          description: Shown exactly once. Store it to manage or delete the link.
+          example: g3UQZ8n2...redacted
+
+    StatsResponse:
+      type: object
+      required: [totalClicks, last7Days]
+      properties:
+        totalClicks: { type: integer, format: int64, example: 42 }
+        last7Days:
+          type: array
+          items:
+            type: object
+            required: [date, count]
+            properties:
+              date: { type: string, format: date, example: "2026-07-21" }
+              count: { type: integer, format: int64, example: 7 }
+
+    ErrorResponse:
+      type: object
+      required: [error, correlationId]
+      properties:
+        error: { type: string, example: Not found }
+        correlationId:
+          type: string
+          description: Echoed as X-Correlation-Id; quote it in support requests.
+          example: 6f1c2b7e-2a4d-4b0e-9c1a-1f2e3d4c5b6a
+
+  responses:
+    BadRequest:
+      description: Invalid request (bad URL, malformed body, or bad expiry)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Not found (also returned for failed auth, to prevent probing)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PayloadTooLarge:
+      description: Request body exceeded the size cap
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: Could not allocate a unique code; retry
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
