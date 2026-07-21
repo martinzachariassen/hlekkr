@@ -21,6 +21,8 @@ data class AppConfig(
         val code: CodeSettings,
         // Blank when unset: management routes are then open (local dev). Set in production.
         val internalApiKey: String?,
+        // Trust X-Forwarded-For for the client IP. Only safe behind a trusted proxy.
+        val trustProxyHeaders: Boolean,
     )
 
     data class RateLimitSettings(
@@ -66,6 +68,7 @@ data class AppConfig(
                         maxAttempts = config.getInt("app.code.maxAttempts"),
                     ),
                     internalApiKey = config.getString("app.internalApiKey").ifBlank { null },
+                    trustProxyHeaders = config.getBoolean("app.trustProxyHeaders"),
                 ),
                 db = DbConfig(
                     url = config.getString("db.url"),

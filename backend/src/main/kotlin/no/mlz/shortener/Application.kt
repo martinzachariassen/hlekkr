@@ -20,6 +20,7 @@ import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.callid.CallId
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,13 @@ fun Application.module(config: AppConfig, repository: LinkRepository) {
     val components = buildComponents(config, repository, clickTracker)
     if (components.internalApiKey == null) {
         environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
+    }
+
+    // Behind Railway's edge the socket peer is the proxy, so the rate limiter would bucket every
+    // visitor together. useLastProxy() takes the rightmost X-Forwarded-For entry — the one the trusted
+    // proxy appends — so a client can't prepend a spoofed IP to escape its own bucket.
+    if (config.app.trustProxyHeaders) {
+        install(XForwardedHeaders) { useLastProxy() }
     }
 
     install(CallId) {

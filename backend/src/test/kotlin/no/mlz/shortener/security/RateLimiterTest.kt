@@ -49,4 +49,30 @@ class RateLimiterTest {
         limiter.check("ip") // drains the single token
         assertEquals(1, limiter.check("ip").retryAfterSeconds)
     }
+
+    @Test
+    fun `evicts replenished buckets once the map fills`() {
+        val limiter = TokenBucketRateLimiter(capacity = 1, refillPerMinute = 60, maxEntries = 3, nanoTime = { now })
+        limiter.check("a")
+        limiter.check("b")
+        limiter.check("c")
+        assertEquals(3, limiter.trackedKeys())
+
+        now += TimeUnit.SECONDS.toNanos(5) // all three refill to full
+        limiter.check("d")                 // hits the cap, sweeps the replenished ones first
+
+        assertEquals(1, limiter.trackedKeys())
+    }
+
+    @Test
+    fun `keeps still-limited buckets when sweeping`() {
+        val limiter = TokenBucketRateLimiter(capacity = 1, refillPerMinute = 6, maxEntries = 2, nanoTime = { now })
+        limiter.check("keep") // drains; needs 10s to refill
+        limiter.check("also")
+
+        now += TimeUnit.SECONDS.toNanos(1) // neither has refilled
+        limiter.check("new")               // sweep finds nothing evictable; map grows past the soft cap
+
+        assertFalse(limiter.check("keep").allowed)
+    }
 }

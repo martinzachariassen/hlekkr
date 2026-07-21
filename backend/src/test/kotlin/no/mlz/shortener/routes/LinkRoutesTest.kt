@@ -84,6 +84,7 @@ class LinkRoutesTest {
             ),
             code = AppConfig.CodeSettings(length = 7, maxAttempts = 5),
             internalApiKey = internalApiKey,
+            trustProxyHeaders = false,
         ),
         db = AppConfig.DbConfig("unused", "unused", "unused", 1, 1000, 1000),
     )
