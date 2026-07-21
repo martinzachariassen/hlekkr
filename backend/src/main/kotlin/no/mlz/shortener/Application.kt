@@ -9,6 +9,7 @@ import no.mlz.shortener.repository.Database
 import no.mlz.shortener.repository.LinkRepository
 import no.mlz.shortener.routes.linkRoutes
 import no.mlz.shortener.security.CodeGenerator
+import no.mlz.shortener.security.HostBlocklist
 import no.mlz.shortener.security.TokenBucketRateLimiter
 import no.mlz.shortener.security.installSecurityHeaders
 import no.mlz.shortener.service.ClickTracker
@@ -61,7 +62,10 @@ fun Application.module(config: AppConfig, repository: LinkRepository) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val clickTracker = ClickTracker(repository, appScope).also { it.start() }
 
-    val components = buildComponents(config, repository, clickTracker)
+    val blocklist = HostBlocklist.from(config.app.blockedHosts.joinToString(","), config.app.blockedHostsFile)
+    if (blocklist.size > 0) environment.log.info("Loaded ${blocklist.size} blocked target domain(s).")
+
+    val components = buildComponents(config, repository, clickTracker, blocklist)
     if (components.internalApiKey == null) {
         environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
     }
@@ -96,10 +100,11 @@ private fun buildComponents(
     config: AppConfig,
     repository: LinkRepository,
     clickTracker: ClickTracker,
+    blocklist: HostBlocklist,
 ): AppComponents {
     val service = LinkService(
         repository = repository,
-        urlValidator = UrlValidator(config.app.baseUrl),
+        urlValidator = UrlValidator(config.app.baseUrl, blocklist),
         codeGenerator = CodeGenerator(config.app.code.length),
         clickTracker = clickTracker,
         baseUrl = config.app.baseUrl,

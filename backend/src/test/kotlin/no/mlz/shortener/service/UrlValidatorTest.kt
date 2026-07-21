@@ -1,5 +1,6 @@
 package no.mlz.shortener.service
 
+import no.mlz.shortener.security.HostBlocklist
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -67,6 +68,22 @@ class UrlValidatorTest {
     @ValueSource(strings = ["https://sho.rt/abc", "https://sho.rt/", "http://sho.rt/loop"])
     fun `rejects self-referential targets`(url: String) {
         assertThrows(InvalidTargetUrlException::class.java) { validator.validate(url) }
+    }
+
+    @Test
+    fun `rejects a target on the configured blocklist, including subdomains`() {
+        val guarded = UrlValidator(
+            baseUrl = "https://sho.rt",
+            blocklist = HostBlocklist.of(listOf("blocked.example")),
+        )
+        assertThrows(InvalidTargetUrlException::class.java) {
+            guarded.validate("https://blocked.example/x")
+        }
+        assertThrows(InvalidTargetUrlException::class.java) {
+            guarded.validate("https://cdn.blocked.example/y")
+        }
+        // An unrelated host still passes.
+        assertEquals("https://allowed.example/z", guarded.validate("https://allowed.example/z"))
     }
 
     @Test

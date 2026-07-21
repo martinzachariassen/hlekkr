@@ -23,6 +23,9 @@ data class AppConfig(
         val internalApiKey: String?,
         // Trust X-Forwarded-For for the client IP. Only safe behind a trusted proxy.
         val trustProxyHeaders: Boolean,
+        // Denylisted target domains (content policy). Empty => only the SSRF rules apply.
+        val blockedHosts: List<String>,
+        val blockedHostsFile: String?,
     )
 
     data class RateLimitSettings(
@@ -69,6 +72,11 @@ data class AppConfig(
                     ),
                     internalApiKey = config.getString("app.internalApiKey").ifBlank { null },
                     trustProxyHeaders = config.getBoolean("app.trustProxyHeaders"),
+                    blockedHosts = config.getString("app.blocklist.hosts")
+                        .split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() },
+                    blockedHostsFile = config.getString("app.blocklist.file").ifBlank { null },
                 ),
                 db = DbConfig(
                     url = config.getString("db.url"),

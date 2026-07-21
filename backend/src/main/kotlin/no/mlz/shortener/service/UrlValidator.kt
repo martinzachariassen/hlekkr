@@ -1,5 +1,6 @@
 package no.mlz.shortener.service
 
+import no.mlz.shortener.security.HostBlocklist
 import java.net.InetAddress
 import java.net.URI
 import java.net.URISyntaxException
@@ -8,7 +9,10 @@ import java.net.URISyntaxException
 // today, but the checks mean adding a preview/screenshot feature later can't silently open a hole.
 // DNS is deliberately NOT resolved — only the literal host is validated; a future fetch must
 // re-validate the resolved address then, since it can change between now and fetch time.
-class UrlValidator(baseUrl: String) {
+//
+// The blocklist adds content-policy filtering (adult/malware/phishing/... domains) on top of the
+// SSRF checks; it is empty unless configured, so by default only the SSRF rules apply.
+class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostBlocklist.empty()) {
 
     private val selfHost: String = runCatching { URI(baseUrl).host }
         .getOrNull()
@@ -57,6 +61,10 @@ class UrlValidator(baseUrl: String) {
 
         if (host == selfHost) {
             throw InvalidTargetUrlException("URL must not point back at this service")
+        }
+
+        if (blocklist.isBlocked(host)) {
+            throw InvalidTargetUrlException("URL targets a blocked domain")
         }
 
         return raw

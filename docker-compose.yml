@@ -48,6 +48,9 @@ services:
   api:
     build:
       context: ./backend
+      args:
+        # Keep local builds fast and offline; the content blocklist is fetched only in real deploys.
+        FETCH_BLOCKLISTS: "false"
     environment:
       DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-shortener}
       DATABASE_USER: ${APP_DB_USER:-shortener_app}

@@ -125,6 +125,26 @@ and to an explicit test.
   deliberately *not* resolved at creation time: it would add nondeterminism and its own lookup
   surface and would be stale by fetch time, so any future fetch must re-validate the resolved
   address then.
+- **Content policy via a domain blocklist.** Separately from the SSRF checks, `UrlValidator`
+  consults a `HostBlocklist` and refuses to shorten targets on it (adult, malware, phishing).
+  Matching is by domain *suffix*, so one entry covers a domain and all its subdomains; the set is in
+  memory and each check walks the host's label suffixes, so even a 100k-domain feed costs nothing
+  per request. The production image **bakes two free, maintained lists at build time** — the
+  [HaGeZi NSFW](https://github.com/hagezi/dns-blocklists) list (adult, ~115k registrable domains) and
+  [URLhaus](https://urlhaus.abuse.ch/) (fresh malware) — so every redeploy refreshes them and there
+  is **no runtime dependency**. To keep the baked lists current, a weekly
+  [`refresh-blocklist`](.github/workflows/refresh-blocklist.yml) workflow re-fetches both feeds (and
+  fails loudly if either 404s or returns suspiciously few domains — a canary for upstream URL rot),
+  then bumps a `.blocklist-epoch` marker that busts the Dockerfile's fetch-layer cache; the push
+  triggers Railway's auto-deploy, which rebuilds with freshly-downloaded lists. Load is deterministic
+  and in-memory (~25 MB heap); the app logs the domain count at startup. The list is empty (a no-op)
+  for local Compose builds, which pass
+  `FETCH_BLOCKLISTS=false` to stay fast and offline. Operators can override with `BLOCKED_HOSTS`
+  (inline) or point `BLOCKED_HOSTS_FILE` at their own list (plain one-domain-per-line *or*
+  `hosts`-file format — e.g. a [UT1 Capitole](https://dsi.ut-capitole.fr/blacklists/) category).
+  This covers *known* bad domains; live URL-level malware/phishing verdicts (e.g. Google Safe
+  Browsing) would be a create-time add-on, deliberately not wired in — a synchronous third-party
+  call gating writes isn't worth it here, and it wouldn't cover adult content anyway.
 - **Short codes are random, not sequential.** A base62-of-autoincrement scheme is enumerable —
   walk `/1`, `/2`, `/3` and scrape every link ever made. Codes are 7 random base62 characters
   from `SecureRandom` with a DB uniqueness check and a bounded retry that **fails closed**.
