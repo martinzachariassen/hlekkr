@@ -191,9 +191,16 @@ cd backend
   clean `400`, missing/wrong owner token → `404`, rate limit → `429 + Retry-After`, and the
   presence of security headers.
 
-CI (GitHub Actions) runs `./gradlew build test`, a Trivy dependency vulnerability scan that
-fails on any HIGH/CRITICAL CVE, and CodeQL static analysis; Dependabot keeps Gradle, Actions,
-and Docker dependencies current.
+CI (GitHub Actions) runs `./gradlew build` (compile + full test suite), a Trivy dependency
+scan that fails on any HIGH/CRITICAL CVE, `dependency-review` on PRs, OpenSSF Scorecard, and a
+Conventional-Commit PR-title check. Dependabot keeps Gradle, Actions, and Docker dependencies
+current, and `main` is protected by a ruleset requiring the `build` check and a PR.
+
+Static analysis is enforced at the compiler: `allWarningsAsErrors = true` fails the build on any
+Kotlin warning. A dedicated SAST scanner (CodeQL / detekt) is intentionally *not* wired in yet —
+as of this writing neither supports the bleeding-edge **JDK 25 + Kotlin 2.4** toolchain this
+project pins (CodeQL's Kotlin extractor sees "no source"; detekt's bundled compiler rejects
+JVM target 25). It should be added once the tooling catches up, or by pinning an older toolchain.
 
 ## Out of scope (and why)
 
