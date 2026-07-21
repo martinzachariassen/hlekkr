@@ -1,0 +1,12 @@
+# Railway deploy config for the API service. In the Railway dashboard, set this service's
+# root directory to `backend` so this file and the Dockerfile are picked up.
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

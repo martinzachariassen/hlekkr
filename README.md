@@ -13,7 +13,7 @@ url-shortener/
 ├── backend/     # Ktor API (this project)
 ├── frontend/    # reserved for the web client (later)
 ├── docker-compose.yml
-└── .github/     # CI: build/test, dependency scan, CodeQL
+└── .github/     # CI: build/test, dependency scan, scorecard
 ```
 
 ## Contents
@@ -22,7 +22,9 @@ url-shortener/
 - [Why Ktor + raw JDBC over Spring/ORM](#why-ktor--raw-jdbc-over-springorm)
 - [API](#api)
 - [Security decisions](#security-decisions)
+- [Restricting the API to your frontend](#restricting-the-api-to-your-frontend)
 - [Running locally](#running-locally)
+- [Deploying to Railway](#deploying-to-railway)
 - [Testing](#testing)
 - [Out of scope (and why)](#out-of-scope-and-why)
 
@@ -72,17 +74,24 @@ deliverable here, not an accident.
 
 ## API
 
-| Method   | Path                  | Auth               | Notes                                                                    |
-| -------- | --------------------- | ------------------ | ------------------------------------------------------------------------ |
-| `POST`   | `/links`              | none (rate-limited)| Body `{targetUrl, expiresAt?}` → `{code, shortUrl, ownerToken}`. `ownerToken` is shown **once**. |
-| `GET`    | `/{code}`             | none               | `302` redirect. Records a click asynchronously. Generic `404` if missing/expired/deleted. |
-| `GET`    | `/links/{code}/stats` | Bearer owner token | `{totalClicks, last7Days: [{date, count}]}`                              |
-| `DELETE` | `/links/{code}`       | Bearer owner token | Soft delete.                                                             |
+Interactive docs are served from the running app: **Swagger UI at [`/swagger`](http://localhost:8080/swagger)**
+and the raw OpenAPI 3.1 spec at [`/openapi.yaml`](http://localhost:8080/openapi.yaml) (both public). The
+spec is hand-authored (`backend/src/main/resources/openapi/documentation.yaml`) — explicit and
+reviewable, in keeping with the rest of the project.
 
-Example:
+| Method   | Path                  | Access                          | Notes                                                                    |
+| -------- | --------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| `POST`   | `/links`              | frontend key (rate-limited)     | Body `{targetUrl, expiresAt?}` → `{code, shortUrl, ownerToken}`. `ownerToken` is shown **once**. |
+| `GET`    | `/{code}`             | **public**                      | `302` redirect. Records a click asynchronously. Generic `404` if missing/expired/deleted. |
+| `GET`    | `/links/{code}/stats` | frontend key + Bearer owner token | `{totalClicks, last7Days: [{date, count}]}`                            |
+| `DELETE` | `/links/{code}`       | frontend key + Bearer owner token | Soft delete.                                                            |
+| `GET`    | `/health`             | **public**                      | Liveness probe → `200 OK`.                                               |
+
+"frontend key" = the `X-Internal-Key` header described in [Restricting the API to your frontend](#restricting-the-api-to-your-frontend).
+It is unset (open) in local development.
 
 ```bash
-# Create
+# Create (locally, with no INTERNAL_API_KEY set)
 curl -s -X POST localhost:8080/links \
   -H 'Content-Type: application/json' \
   -d '{"targetUrl":"https://example.com"}'
@@ -94,6 +103,10 @@ curl -i localhost:8080/d10ndrX          # 302 Location: https://example.com
 # Stats / delete (owner token required)
 curl localhost:8080/links/d10ndrX/stats -H "Authorization: Bearer g3UQ…"
 curl -X DELETE localhost:8080/links/d10ndrX -H "Authorization: Bearer g3UQ…"
+
+# Once INTERNAL_API_KEY is set, management calls also need the service header:
+curl -X POST localhost:8080/links -H 'X-Internal-Key: <key>' \
+  -H 'Content-Type: application/json' -d '{"targetUrl":"https://example.com"}'
 ```
 
 ## Security decisions
@@ -128,10 +141,16 @@ and to an explicit test.
   everything else to a generic `500`. Exception messages, stack traces, and SQL text are logged
   server-side with a correlation id that is also returned to the client (`X-Correlation-Id` and
   in the error body) for support — never the underlying detail.
+- **Frontend-only management surface.** `POST /links`, stats, and delete require an
+  `X-Internal-Key` header matching a per-deployment secret that only the frontend holds; a
+  constant-time compare gates it and a miss returns the same generic `404`. The redirect stays
+  public. See [Restricting the API to your frontend](#restricting-the-api-to-your-frontend) for
+  why this — not CORS — is the real gate.
 - **Hardening headers on every response.** HSTS, `X-Content-Type-Options: nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy:
-  default-src 'none'` (this is a JSON API that serves no HTML). CORS is an explicit allow-list,
-  never `*`, and credentials are not enabled.
+  default-src 'none'` (this is a JSON API that serves no HTML — the Swagger UI docs get a
+  narrowly-relaxed same-origin CSP so the page can load its own assets). CORS is an explicit
+  allow-list, never `*`, and credentials are not enabled.
 - **Least-privilege database role.** Migrations run under a privileged admin role (the
   `flyway` step in Compose, or a deploy job); the application connects under a role with **DML
   only** — no DDL, not a superuser. `ALTER DEFAULT PRIVILEGES` grants the app DML on the tables
@@ -143,37 +162,81 @@ and to an explicit test.
   at startup** if a required one is missing or blank. `.env` is git-ignored; only `.env.example`
   is committed. The connection string is never logged.
 
+## Restricting the API to your frontend
+
+The goal: only the project's own frontend can create, inspect, or delete links — not anyone with
+`curl`. The redirect endpoint `GET /{code}` is the exception; it *is* the short link, so it must
+stay public.
+
+**CORS is not enough.** CORS is a browser-enforced policy: it stops a malicious *web page* from
+reading your API cross-origin, but `curl`, Postman, and any server ignore it entirely. Relying on
+CORS alone would leave `POST /links` open to the world. So the real gate is a **shared service
+key**: the management routes require an `X-Internal-Key` header whose value only the frontend
+knows, checked in constant time, with a miss returning the same generic `404` as everything else.
+
+The key belongs to the frontend's **server**, never the browser. The browser talks to the
+frontend's own backend (a Next.js route handler / BFF, say), which injects the key and proxies to
+this API. The secret never ships to the client.
+
+```
+Browser ──> Frontend server (holds INTERNAL_API_KEY) ──X-Internal-Key──> Shortener API
+                                                                            /links*  key required
+Anyone ─────────────────────────────────────────────────────────────────> GET /{code}  public
+```
+
+This composes with the existing per-link owner token to give two independent layers: the service
+key answers *"is this the frontend?"* and the owner token answers *"does this caller own this
+link?"*. Locally, leaving `INTERNAL_API_KEY` unset disables the gate (the app logs a warning at
+startup) so development stays friction-free.
+
 ## Running locally
 
-Requires JDK 25 and Docker.
-
-### Full stack (Docker Compose)
+Requires JDK 25 and Docker. The Compose file ships dev-only defaults, so there is **nothing to
+configure** for a first run:
 
 ```bash
-cp .env.example .env     # fill in passwords
-docker compose up --build
+docker compose up --build      # or: make up
 ```
 
 This starts Postgres 18, runs Flyway migrations under the admin role (a one-shot `flyway`
-service), then starts the API on `http://localhost:8080` connected under the least-privilege
-app role.
+service), then starts the API on `http://localhost:8080` under the least-privilege app role.
+Open [`/swagger`](http://localhost:8080/swagger) to explore it. `make` on its own lists the
+other shortcuts (`make test`, `make run`, `make logs`, …). To override any default (passwords,
+CORS, `INTERNAL_API_KEY`), copy `.env.example` to `.env` and edit.
 
-### App against a local database (`./gradlew run`)
+To run the app from source against just the database:
 
 ```bash
-cp .env.example .env
-docker compose up -d db        # just Postgres
-cd backend
-DATABASE_URL=jdbc:postgresql://localhost:5432/shortener \
-DATABASE_USER=shortener_app DATABASE_PASSWORD=<app pw> \
-DATABASE_MIGRATION_USER=shortener_admin DATABASE_MIGRATION_PASSWORD=<admin pw> \
-BASE_URL=http://localhost:8080 \
-./gradlew run
+make run     # starts Postgres, then `./gradlew run` with the right env wired in
 ```
 
-Here the app applies migrations itself on startup (using the admin credentials it is given) —
-convenient for local iteration. In containers this is turned off (`RUN_MIGRATIONS_ON_STARTUP=false`)
-because migrations are a separate privileged step.
+There the app applies migrations itself on startup (using admin credentials) — convenient for
+local iteration. In containers that is turned off (`RUN_MIGRATIONS_ON_STARTUP=false`) because
+migrations are a separate privileged step.
+
+## Deploying to Railway
+
+The backend deploys as a single Railway service from `backend/Dockerfile` (`backend/railway.toml`
+sets the builder and the `/health` check — point the service's root directory at `backend`).
+Configure it as follows:
+
+- **Postgres** — add a Railway Postgres plugin and set `DATABASE_URL`, `DATABASE_USER`,
+  `DATABASE_PASSWORD`. For least privilege, run migrations under an admin role and let the app
+  connect as a DML-only role; the simplest single-service option is to set
+  `RUN_MIGRATIONS_ON_STARTUP=true` with `DATABASE_MIGRATION_USER` / `DATABASE_MIGRATION_PASSWORD`
+  pointing at the privileged role, so the schema is applied on boot and the app then serves under
+  the restricted role.
+- **`INTERNAL_API_KEY`** — set a long random value (`openssl rand -base64 32`). Add the *same*
+  value to the frontend service (Railway shared variables make this one definition) and have the
+  frontend's server send it as `X-Internal-Key`. This is what locks the management API to your
+  frontend.
+- **`BASE_URL`** — the API's public URL, used to build `shortUrl`s and to reject self-referential
+  targets. **`CORS_ALLOWED_ORIGINS`** — your frontend's origin, as defense-in-depth for browsers.
+- **Want the management API completely off the public internet?** Give this service *no* public
+  domain and put a thin public redirect service in front, then have the frontend reach the
+  management API over Railway's private network (`*.railway.internal`). That is stronger isolation
+  at the cost of a second service; the service-key gate above is the pragmatic single-service
+  equivalent and still applies.
 
 ## Testing
 
@@ -183,13 +246,14 @@ cd backend
 ```
 
 - **Unit** (JUnit 5 + MockK): `UrlValidator`, `LinkService`, `CodeGenerator`, rate limiter,
-  owner-token hashing.
+  owner-token hashing, and the service-key constant-time compare.
 - **Repository** (Testcontainers, real Postgres 18): parameterized queries, uniqueness,
   soft-delete/expiry filtering, click aggregation, and a `'; DROP TABLE links; --` inertness test.
 - **End-to-end** (Ktor test client + Testcontainers): every endpoint plus the explicit security
   cases — dangerous schemes, private/metadata targets, oversized body → `413`, malformed JSON →
-  clean `400`, missing/wrong owner token → `404`, rate limit → `429 + Retry-After`, and the
-  presence of security headers.
+  clean `400`, missing/wrong owner token → `404`, missing/wrong service key → `404` (with the
+  redirect still public), rate limit → `429 + Retry-After`, the security headers, and that
+  `/health` and `/openapi.yaml` stay public.
 
 CI (GitHub Actions) runs `./gradlew build` (compile + full test suite), a Trivy dependency
 scan that fails on any HIGH/CRITICAL CVE, `dependency-review` on PRs, OpenSSF Scorecard, and a

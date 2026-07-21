@@ -24,6 +24,9 @@ COPY --from=build /app/build/libs/*-all.jar app.jar
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD wget -qO- http://localhost:8080/health || exit 1
+
 # Container-aware heap sizing; fail fast if the JVM can't start.
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
