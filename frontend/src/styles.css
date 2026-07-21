@@ -1,0 +1,657 @@
+/* Theme lifted from mlz.no: warm paper, near-black ink, a single teal accent; Inter + a serif display. */
+:root {
+  --paper: #ecebe4;
+  --paper-2: #e4e2da;
+  --card: #f4f3ec;
+  --ink: #1a1a18;
+  --ink-2: #4a4a45;
+  --muted: #6e6c64;
+  --line: #cbc9be;
+  --accent: oklch(0.74 0.13 195);
+  --accent-deep: oklch(0.52 0.1 200);
+  --danger: #8a3324;
+  --warn-bg: #f2e7cd;
+  --warn-ink: #7a4e15;
+  --warn-line: #d8b978;
+  /* Inter: a calm, low-contrast grotesque built for screens. Body + UI. */
+  --sans: "Inter", system-ui, sans-serif;
+  --serif: "Instrument Serif", Georgia, serif;
+  /* Reserved for technical strings (codes, keys, short URLs) where 0/O and l/1 must not blur. */
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --gutter: clamp(20px, 5vw, 56px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: inherit;
+}
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- shell: header / centered stage / footer, one screen tall ---- */
+.page {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  /* Respect notches / home indicators when viewport-fit=cover lets content reach the edges. */
+  padding: 0 max(var(--gutter), env(safe-area-inset-right)) env(safe-area-inset-bottom)
+    max(var(--gutter), env(safe-area-inset-left));
+}
+
+.topbar,
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 0;
+}
+.foot {
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.foot span:last-child {
+  text-align: right;
+}
+.foot a {
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.foot a:hover {
+  color: var(--accent-deep);
+  border-color: var(--accent);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.brand-mark {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: transform 0.2s ease, border-radius 0.2s ease;
+}
+.brand:hover .brand-mark {
+  transform: scale(1.18) rotate(8deg);
+  border-radius: 4px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.nav a {
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.nav a:hover,
+.linklike:hover {
+  color: var(--ink);
+}
+
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  transition: color 0.15s ease;
+}
+.linklike.accent {
+  color: var(--accent-deep);
+}
+
+/* ---- stage ---- */
+.stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  max-width: 660px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.intro {
+  animation: fadeUp 0.5s ease both;
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.eyebrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 0 16px;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* Pin the dot to the first line's cap height so it stays put when the label wraps. */
+.eyebrow .dot {
+  flex-shrink: 0;
+  margin-top: 0.42em;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+h1 {
+  font-size: clamp(2.8rem, 8vw, 4.6rem);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+.lede {
+  margin: 14px 0 0;
+  max-width: 46ch;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+}
+
+/* ---- form + inputs ---- */
+.panel {
+  animation: fadeUp 0.5s ease 0.06s both;
+}
+.field-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.field-row.wrap {
+  flex-wrap: wrap;
+}
+.field {
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 15px;
+  flex: 1 1 260px;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field.grow {
+  flex: 1 1 180px;
+}
+.field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
+}
+.field input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 15px 0;
+  font-size: 0.9rem;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #08201f;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0 24px;
+  min-height: 52px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, filter 0.15s, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px -8px rgba(26, 26, 24, 0.45);
+}
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+}
+.btn.ghost:hover {
+  background: var(--ink);
+  color: var(--paper);
+  filter: none;
+}
+.btn.danger {
+  background: var(--danger);
+  color: var(--paper);
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+}
+
+.msg {
+  margin: 12px 0 0;
+  min-height: 1.2em;
+  font-size: 0.82rem;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.msg.show {
+  opacity: 1;
+}
+.msg.error {
+  color: var(--danger);
+}
+
+/* ---- trust chips ---- */
+.trust {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin: 0;
+  padding: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  animation: fadeUp 0.5s ease 0.12s both;
+}
+.trust li {
+  position: relative;
+  padding-left: 16px;
+}
+.trust li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ---- result ---- */
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px 15px;
+}
+.result-url {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 0.15s ease;
+}
+/* Codes and keys are read and typed character by character — a mono keeps 0/O and l/1 distinct. */
+#code,
+#token {
+  font-family: var(--mono);
+}
+.result-url:hover {
+  color: var(--accent-deep);
+}
+.copy {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 13px;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.copy:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.token {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  border-radius: 10px;
+  padding: 15px;
+}
+.token-label {
+  margin: 0 0 10px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--warn-ink);
+}
+.token .result-row {
+  background: rgba(255, 255, 255, 0.5);
+  border: none;
+}
+.token-val {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  word-break: break-all;
+  color: var(--warn-ink);
+}
+
+.result-actions {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* ---- stats ---- */
+.stats {
+  margin-top: 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  animation: fadeUp 0.35s ease both;
+}
+.stats-total {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stats-total .num {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.stats-total .lbl {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 92px;
+}
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 100%;
+}
+.bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  transform-origin: bottom;
+  transition: height 0.45s ease;
+  animation: barGrow 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+/* Stagger the seven columns so the week fills in left-to-right on reveal. */
+.bar-col:nth-child(1) .bar {
+  animation-delay: 0.08s;
+}
+.bar-col:nth-child(2) .bar {
+  animation-delay: 0.13s;
+}
+.bar-col:nth-child(3) .bar {
+  animation-delay: 0.18s;
+}
+.bar-col:nth-child(4) .bar {
+  animation-delay: 0.23s;
+}
+.bar-col:nth-child(5) .bar {
+  animation-delay: 0.28s;
+}
+.bar-col:nth-child(6) .bar {
+  animation-delay: 0.33s;
+}
+.bar-col:nth-child(7) .bar {
+  animation-delay: 0.38s;
+}
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.bar-count,
+.bar-day {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+.bar-day {
+  text-transform: uppercase;
+}
+.danger {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.danger-label {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+.danger-text {
+  color: var(--danger);
+}
+
+/* ---- responsive ---- */
+/* Tablet / large phone: tighten the chrome so the header and footer never crowd. */
+@media (max-width: 720px) {
+  .topbar,
+  .foot {
+    padding: 18px 0;
+  }
+  .nav {
+    gap: 16px;
+  }
+}
+
+/* Phones: stack the forms, shrink the display type, and keep everything one column. */
+@media (max-width: 560px) {
+  /* Flow from the top instead of centering in the viewport — no floaty gaps, predictable position.
+     The footer still pins to the bottom via the page grid's trailing auto row. */
+  .stage {
+    justify-content: flex-start;
+    gap: 20px;
+    padding: 20px 0 32px;
+  }
+  h1 {
+    font-size: clamp(2.4rem, 12vw, 3.4rem);
+  }
+  .lede {
+    max-width: none;
+  }
+  .field-row,
+  .field-row.wrap {
+    flex-direction: column;
+  }
+  /* In a column the flex-basis becomes a *height*, so drop the row basis and size to content. */
+  .field,
+  .field.grow {
+    flex: 0 0 auto;
+  }
+  /* 16px keeps iOS from auto-zooming the viewport when an input is focused. */
+  .field input {
+    font-size: 16px;
+  }
+  .btn {
+    width: 100%;
+  }
+
+  /* Stack each value over a full-width action instead of wrapping the button onto a ragged
+     half-line — the source of the awkward mobile wrapping. */
+  .result-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 15px;
+  }
+  .copy {
+    width: 100%;
+    padding: 12px;
+    font-size: 0.78rem;
+  }
+  .result-url {
+    font-size: 0.95rem;
+  }
+  .result-actions {
+    gap: 16px 24px;
+  }
+
+  /* Delete confirm: full-width destructive button, text links left-aligned beneath it. */
+  .danger {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .danger-label {
+    margin-bottom: 2px;
+  }
+  .btn.danger {
+    width: 100%;
+    min-height: 46px;
+  }
+  .danger .linklike {
+    padding: 6px 0;
+  }
+
+  .foot {
+    font-size: 0.64rem;
+    gap: 10px;
+  }
+}
+
+/* Small phones: keep the header on one line by tightening it, and stack the footer. */
+@media (max-width: 400px) {
+  .topbar {
+    gap: 12px;
+  }
+  .nav {
+    gap: 14px;
+    font-size: 0.78rem;
+  }
+  .foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .foot span:last-child {
+    text-align: left;
+  }
+}
+
+/* Touch devices: enlarge tap targets that are otherwise text-sized. */
+@media (hover: none) and (pointer: coarse) {
+  .nav a,
+  .nav .linklike {
+    padding: 6px 0;
+  }
+  .copy {
+    padding: 11px 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

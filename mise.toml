@@ -1,0 +1,82 @@
+# One toolchain, one command. `mise install` pins the tools below; `mise run dev` brings the whole
+# stack up. See the root README for the full picture.
+
+[tools]
+java = "temurin-25"
+node = "lts"
+# Pinned (not "latest") so local and CI resolve identical deps; matches package.json packageManager.
+pnpm = "10.11.0"
+
+# Derive the API's DB creds from the SAME source docker-compose uses (the git-ignored .env, if
+# present), falling back to the dev defaults baked into docker-compose.yml. One source of truth means
+# the app and the Postgres role can never drift apart.
+[tasks._api]
+hide = true
+run = """
+[ -f .env ] && set -a && . ./.env && set +a
+: "${POSTGRES_DB:=shortener}"
+: "${APP_DB_USER:=shortener_app}"
+: "${APP_DB_PASSWORD:=dev_app_pw}"
+: "${DB_ADMIN_USER:=shortener_admin}"
+: "${DB_ADMIN_PASSWORD:=dev_admin_pw}"
+docker compose up -d --wait db
+# --no-daemon keeps the app JVM inside this task's process group, so the dev task's `kill 0` reaps it
+# on Ctrl-C. A daemon-forked JVM lives in the daemon's own group, survives, and squats on :8080 —
+# which then breaks the next `mise run dev` with "Address already in use".
+cd backend && \
+  DATABASE_URL="jdbc:postgresql://localhost:5432/${POSTGRES_DB}" \
+  DATABASE_USER="$APP_DB_USER" DATABASE_PASSWORD="$APP_DB_PASSWORD" \
+  DATABASE_MIGRATION_USER="$DB_ADMIN_USER" DATABASE_MIGRATION_PASSWORD="$DB_ADMIN_PASSWORD" \
+  BASE_URL="http://localhost:8080" \
+  CORS_ALLOWED_ORIGINS="http://localhost:5173" \
+  ./gradlew -q --console=plain --no-daemon run
+"""
+
+[tasks.dev]
+description = "Run Postgres + API + web app together (Ctrl-C stops all)"
+run = """
+trap 'kill 0' EXIT INT TERM
+mise run _api &
+( cd frontend && pnpm install --silent && pnpm dev ) &
+wait
+"""
+
+[tasks.backend]
+description = "Run just the API from source against local Postgres"
+run = "mise run _api"
+
+[tasks.web]
+description = "Run just the web app (expects the API already running)"
+dir = "frontend"
+run = "pnpm install --silent && pnpm dev"
+
+[tasks.up]
+description = "Run the whole stack in Docker (Postgres + migrations + API) on :8080"
+run = "docker compose up --build"
+
+[tasks.down]
+description = "Stop the Docker stack and remove its volumes"
+run = "docker compose down -v"
+
+[tasks.logs]
+description = "Tail the containerized API logs"
+run = "docker compose logs -f api"
+
+[tasks.test]
+description = "Run the backend test suite (unit + Testcontainers + e2e)"
+run = "cd backend && ./gradlew test"
+
+[tasks.lint]
+description = "Compile with all warnings as errors — the project's static-analysis gate"
+run = "cd backend && ./gradlew compileKotlin compileTestKotlin"
+
+[tasks.build]
+description = "Build backend jar and frontend bundle"
+run = """
+cd backend && ./gradlew build
+cd frontend && pnpm install --silent && pnpm build
+"""
+
+[tasks.clean]
+description = "Remove backend build outputs"
+run = "cd backend && ./gradlew clean"

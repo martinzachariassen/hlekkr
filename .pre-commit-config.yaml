@@ -1,0 +1,46 @@
+# Local pre-commit hooks. All use language: system so they run tools you already
+# have installed (brew/mise), not managed copies.
+# Activate:  pre-commit install --install-hooks
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, pre-push]
+
+fail_fast: false
+
+repos:
+  - repo: local
+    hooks:
+      # Conventional Commits are enforced on the PR title in CI (the squash-merge subject).
+      - id: shellcheck
+        name: shellcheck (severity=error)
+        entry: shellcheck --severity=error --shell=bash
+        language: system
+        files: '^(scripts/.*\.sh|docker/.*\.sh)$'
+
+      - id: typos
+        name: typos
+        entry: typos
+        language: system
+        pass_filenames: false
+
+      - id: gitleaks
+        name: gitleaks (secret scan)
+        entry: gitleaks dir . --redact --no-banner
+        language: system
+        pass_filenames: false
+
+      - id: actionlint
+        name: actionlint (workflow lint)
+        entry: actionlint
+        language: system
+        pass_filenames: false
+        files: '^\.github/workflows/.*\.ya?ml$'
+
+      # Kotlin: fail on a compile or test break. A full build+test is too heavy for every commit, so
+      # it runs at pre-push, and only when Kotlin/Gradle files actually changed.
+      - id: gradle-test
+        name: gradle build + test
+        stages: [pre-push]
+        entry: bash -c 'cd backend && ./gradlew build --no-daemon'
+        language: system
+        pass_filenames: false
+        files: '^backend/(src/.*|build\.gradle\.kts|settings\.gradle\.kts|gradle/.*)$'

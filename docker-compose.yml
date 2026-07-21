@@ -1,0 +1,94 @@
+# Local development stack: Postgres 18 + Flyway migrations + the API.
+#
+#   docker compose up --build
+#
+# Runs with zero setup: the ${VAR:-default} values below are DEV-ONLY passwords, safe to commit
+# because they never leave your machine. Override any of them by putting real values in a .env
+# file (git-ignored) — see .env.example. Never reuse these defaults in production.
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shortener}
+      POSTGRES_USER: ${DB_ADMIN_USER:-shortener_admin}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-dev_admin_pw}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ stores data in a version subdirectory; mount the parent, not /data.
+      - pgdata:/var/lib/postgresql
+    configs:
+      # First-init SQL, inlined (no separate script file). Postgres runs *.sql in this directory as
+      # POSTGRES_USER against POSTGRES_DB on first boot.
+      - source: app_role_init
+        target: /docker-entrypoint-initdb.d/01-app-role.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_ADMIN_USER:-shortener_admin} -d ${POSTGRES_DB:-shortener}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Migrations run as a discrete privileged step before the app starts; the app role has DML only.
+  flyway:
+    image: flyway/flyway:11-alpine
+    command: >-
+      -url=jdbc:postgresql://db:5432/${POSTGRES_DB:-shortener}
+      -user=${DB_ADMIN_USER:-shortener_admin}
+      -password=${DB_ADMIN_PASSWORD:-dev_admin_pw}
+      -connectRetries=10
+      -locations=filesystem:/flyway/sql
+      migrate
+    volumes:
+      - ./backend/src/main/resources/db/migration:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+      args:
+        # Keep local builds fast and offline; the content blocklist is fetched only in real deploys.
+        FETCH_BLOCKLISTS: "false"
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-shortener}
+      DATABASE_USER: ${APP_DB_USER:-shortener_app}
+      DATABASE_PASSWORD: ${APP_DB_PASSWORD:-dev_app_pw}
+      # Schema is already migrated by the flyway service; the app must not (and cannot) do DDL.
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      # Unset by default => management routes are open locally. Set it to exercise the frontend gate.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+
+configs:
+  # Least-privilege application role (§2.9): the app connects as this DML-only role, while DDL and
+  # migrations run under the privileged POSTGRES_USER. ALTER DEFAULT PRIVILEGES makes the grants
+  # apply automatically to the tables Flyway creates next, so nothing needs re-granting afterwards.
+  # The ${VAR:-default} values are interpolated by Compose (dev-only defaults; override via .env).
+  app_role_init:
+    content: |
+      CREATE ROLE "${APP_DB_USER:-shortener_app}" LOGIN PASSWORD '${APP_DB_PASSWORD:-dev_app_pw}';
+      GRANT CONNECT ON DATABASE "${POSTGRES_DB:-shortener}" TO "${APP_DB_USER:-shortener_app}";
+      GRANT USAGE   ON SCHEMA   public TO "${APP_DB_USER:-shortener_app}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO "${APP_DB_USER:-shortener_app}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT USAGE, SELECT               ON SEQUENCES TO "${APP_DB_USER:-shortener_app}";

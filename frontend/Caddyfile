@@ -1,0 +1,63 @@
+# The single public entrypoint. The API and Postgres have NO public domain on Railway; every
+# request from the internet lands here and Caddy fans out over Railway's private network:
+#
+#   /api/*          -> gated management API  (Caddy injects X-Internal-Key; it never reaches the browser)
+#   /{code}         -> public short-link redirect
+#   /openapi.yaml   -> public OpenAPI contract
+#   /swagger*       -> public Swagger UI
+#   everything else -> the static SPA
+#
+# Because the SPA and its /api calls are same-origin, the backend needs no CORS at all.
+#
+# Env (set as Railway service variables):
+#   PORT              - listen port (Railway sets this automatically)
+#   API_UPSTREAM      - backend private address, e.g. api.railway.internal:8080
+#   INTERNAL_API_KEY  - shared secret; must match the backend's INTERNAL_API_KEY
+#   UMAMI_HOST        - analytics origin allowed by the CSP (default: https://cloud.umami.is)
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:{$PORT:8080} {
+	encode zstd gzip
+	root * /srv
+
+	# Gated management surface: inject the service key, then proxy to the private API.
+	handle_path /api/* {
+		reverse_proxy {$API_UPSTREAM} {
+			header_up X-Internal-Key {$INTERNAL_API_KEY}
+		}
+	}
+
+	# Public API surface, proxied straight through (no key): the OpenAPI contract and Swagger UI.
+	# The API sets its own CSP on these responses. One `path` matcher ORs the paths; the redirect
+	# needs its own regex matcher, so it gets a separate handle block.
+	@docs path /openapi.yaml /swagger /swagger/*
+	handle @docs {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	# The public short-link redirect. This matcher is coupled to the backend's code length
+	# (7-char base62) — keep in sync with app.code.length.
+	@code path_regexp ^/[0-9A-Za-z]{7}$
+	handle @code {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	# Everything else is the static single-page app.
+	handle {
+		try_files {path} /index.html
+		file_server
+
+		header {
+			-Server
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+			Content-Security-Policy "default-src 'none'; script-src 'self' {$UMAMI_HOST:https://cloud.umami.is}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' {$UMAMI_HOST:https://cloud.umami.is}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		}
+	}
+}
