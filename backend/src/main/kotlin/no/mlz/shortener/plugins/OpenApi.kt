@@ -3,16 +3,53 @@ package no.mlz.shortener.plugins
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
-import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 
 private const val SPEC_RESOURCE = "openapi/documentation.yaml"
 
-// Hand-authored OpenAPI spec, served as raw YAML and via Swagger UI — both public by design.
+// Must match the swagger-ui webjar version in gradle/libs.versions.toml — the webjar embeds it in
+// the resource path. Assets are served same-origin (no CDN) so the docs CSP stays free of any
+// third-party host. staticResources() can't serve these: it maps '.' to '/', mangling the version.
+private const val SWAGGER_UI_VERSION = "5.25.3"
+private const val SWAGGER_ASSETS = "META-INF/resources/webjars/swagger-ui/$SWAGGER_UI_VERSION"
+
+// Anchored to a bare filename with a js/css extension: no slashes and no '..', so a request can't
+// traverse out of the vendored asset directory.
+private val ASSET_NAME = Regex("""[a-z0-9-]+\.(js|css)""")
+
+private val SWAGGER_PAGE = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>API reference — url-shortener</title>
+      <link rel="stylesheet" href="/swagger/dist/swagger-ui.css">
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script src="/swagger/dist/swagger-ui-bundle.js"></script>
+      <script src="/swagger/dist/swagger-ui-standalone-preset.js"></script>
+      <script>
+        window.ui = SwaggerUIBundle({
+          url: '/openapi.yaml',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          layout: 'StandaloneLayout'
+        });
+      </script>
+    </body>
+    </html>
+""".trimIndent()
+
+// Hand-authored OpenAPI spec, served as raw YAML and via a self-hosted Swagger UI — both public by
+// design. Assets live under /swagger/dist/ so Caddy's `/swagger/*` matcher proxies them in prod.
 fun Application.configureOpenApi() {
     val spec = environment.classLoader.getResource(SPEC_RESOURCE)?.readText()
+    val loader = environment.classLoader
     routing {
         get("/openapi.yaml") {
             if (spec == null) {
@@ -21,6 +58,16 @@ fun Application.configureOpenApi() {
                 call.respondText(spec, ContentType("application", "yaml"))
             }
         }
-        swaggerUI(path = "swagger", swaggerFile = SPEC_RESOURCE)
+        get("/swagger") { call.respondText(SWAGGER_PAGE, ContentType.Text.Html) }
+        get("/swagger/dist/{file}") {
+            val file = call.parameters["file"].orEmpty()
+            val bytes = if (ASSET_NAME.matches(file)) loader.getResourceAsStream("$SWAGGER_ASSETS/$file")?.readBytes() else null
+            if (bytes == null) {
+                call.respond(HttpStatusCode.NotFound)
+            } else {
+                val type = if (file.endsWith(".css")) ContentType.Text.CSS else ContentType.Application.JavaScript
+                call.respondBytes(bytes, type)
+            }
+        }
     }
 }

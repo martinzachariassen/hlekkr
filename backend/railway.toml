@@ -10,7 +10,8 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/health"
+# Readiness (DB-backed), not liveness, so a deploy only goes live once it can reach Postgres.
+healthcheckPath = "/ready"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

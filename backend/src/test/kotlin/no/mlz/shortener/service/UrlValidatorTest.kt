@@ -19,6 +19,7 @@ class UrlValidatorTest {
             "https://sub.example.co.uk/a/b/c",
             "https://example.com:8443/x",
             "https://192.0.2.1/valid-public-ip", // TEST-NET-1, not private
+            "https://example.com./trailing-fqdn-dot",
         ],
     )
     fun `accepts valid public http and https urls`(url: String) {
@@ -49,6 +50,8 @@ class UrlValidatorTest {
             "http://172.16.0.1/",
             "http://192.168.1.1/router",
             "http://0.0.0.0/",
+            "http://100.64.0.1/",           // carrier-grade NAT 100.64.0.0/10
+            "http://255.255.255.255/",      // limited broadcast
             "http://[::1]/",
             "http://[fe80::1]/",
             "http://[fc00::1]/",
@@ -59,9 +62,49 @@ class UrlValidatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["http://localhost/", "http://localhost:8080/x", "http://api.localhost/"])
+    @ValueSource(
+        strings = [
+            "http://localhost/",
+            "http://localhost:8080/x",
+            "http://api.localhost/",
+            "http://localhost./",       // trailing FQDN dot must not dodge the localhost check
+            "http://api.localhost./",
+        ],
+    )
     fun `rejects localhost hostnames`(url: String) {
         assertThrows(InvalidTargetUrlException::class.java) { validator.validate(url) }
+    }
+
+    // Alternate IPv4 encodings a browser resolves to the same private address (decimal, hex,
+    // octal, short-form). These previously slipped past the canonical dotted-quad check.
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "http://2130706433/",          // decimal 127.0.0.1
+            "http://0x7f000001/",          // hex 127.0.0.1
+            "http://0177.0.0.1/",          // octal-leading 127.0.0.1
+            "http://127.1/",               // short-form 127.0.0.1
+            "http://10.1/",                // short-form 10.0.0.1
+            "http://2852039166/",          // decimal 169.254.169.254 (cloud metadata)
+            "http://0xa9fea9fe/",          // hex 169.254.169.254
+            "http://0/",                   // 0.0.0.0
+        ],
+    )
+    fun `rejects alternate ip encodings of private and loopback addresses`(url: String) {
+        assertThrows(InvalidTargetUrlException::class.java) { validator.validate(url) }
+    }
+
+    @Test
+    fun `a trailing dot does not bypass the self or blocklist checks`() {
+        assertThrows(InvalidTargetUrlException::class.java) { validator.validate("https://sho.rt./x") }
+
+        val guarded = UrlValidator(
+            baseUrl = "https://sho.rt",
+            blocklist = HostBlocklist.of(listOf("blocked.example")),
+        )
+        assertThrows(InvalidTargetUrlException::class.java) {
+            guarded.validate("https://blocked.example./y")
+        }
     }
 
     @ParameterizedTest

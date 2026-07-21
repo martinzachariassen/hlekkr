@@ -72,12 +72,13 @@ class LinkRoutesTest {
         createCapacity: Long = 1000,
         redirectCapacity: Long = 1000,
         internalApiKey: String? = null,
+        allowedOrigins: List<String> = emptyList(),
     ) = AppConfig(
         server = AppConfig.ServerConfig("0.0.0.0", 8080),
         app = AppConfig.AppSettings(
             baseUrl = "https://sho.rt",
             maxBodyBytes = 16384,
-            allowedOrigins = emptyList(),
+            allowedOrigins = allowedOrigins,
             rateLimit = AppConfig.RateLimitSettings(
                 create = AppConfig.BucketSettings(createCapacity, createCapacity),
                 redirect = AppConfig.BucketSettings(redirectCapacity, redirectCapacity),
@@ -225,6 +226,21 @@ class LinkRoutesTest {
     }
 
     @Test
+    fun `stats endpoint is rate limited`() = appTest(config(redirectCapacity = 1)) {
+        val created = createLink("https://example.com")
+        val client = jsonClient()
+        val auth = "Bearer ${created.ownerToken}"
+
+        assertEquals(
+            HttpStatusCode.OK,
+            client.get("/links/${created.code}/stats") { header(HttpHeaders.Authorization, auth) }.status,
+        )
+        val limited = client.get("/links/${created.code}/stats") { header(HttpHeaders.Authorization, auth) }
+        assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+        assertNotNull(limited.headers[HttpHeaders.RetryAfter])
+    }
+
+    @Test
     fun `sets security headers on every response`() = appTest {
         val response = jsonClient().get("/does-not-exist")
         assertEquals("DENY", response.headers["X-Frame-Options"])
@@ -271,6 +287,48 @@ class LinkRoutesTest {
         val spec = client.get("/openapi.yaml")
         assertEquals(HttpStatusCode.OK, spec.status)
         assertTrue(spec.bodyAsText().contains("openapi:"))
+    }
+
+    @Test
+    fun `readiness probe reports healthy when the database is reachable`() = appTest {
+        val ready = jsonClient().get("/ready")
+        assertEquals(HttpStatusCode.OK, ready.status)
+        assertEquals("READY", ready.bodyAsText())
+    }
+
+    @Test
+    fun `swagger ui is self-hosted with no third-party origin`() = appTest {
+        val client = jsonClient()
+
+        val page = client.get("/swagger")
+        assertEquals(HttpStatusCode.OK, page.status)
+        val csp = page.headers["Content-Security-Policy"].orEmpty()
+        assertFalse(csp.contains("unpkg"), "docs CSP still references a CDN: $csp")
+        assertTrue(csp.contains("script-src 'self'"))
+
+        // The bundle is served same-origin from the vendored webjar, not a CDN.
+        assertEquals(HttpStatusCode.OK, client.get("/swagger/dist/swagger-ui-bundle.js").status)
+    }
+
+    @Test
+    fun `bearer token scheme is case-insensitive`() = appTest {
+        val created = createLink("https://example.com")
+        val stats = jsonClient().get("/links/${created.code}/stats") {
+            header(HttpHeaders.Authorization, "bearer ${created.ownerToken}")
+        }
+        assertEquals(HttpStatusCode.OK, stats.status)
+    }
+
+    @Test
+    fun `cors pins the configured origin to its scheme`() = appTest(config(allowedOrigins = listOf("https://app.example"))) {
+        val client = jsonClient()
+
+        val allowed = client.get("/health") { header(HttpHeaders.Origin, "https://app.example") }
+        assertEquals("https://app.example", allowed.headers["Access-Control-Allow-Origin"])
+
+        // Same host over http must NOT be silently allowed by the https-only entry.
+        val wrongScheme = client.get("/health") { header(HttpHeaders.Origin, "http://app.example") }
+        assertEquals(HttpStatusCode.Forbidden, wrongScheme.status)
     }
 
     private suspend fun assertNoStackTrace(response: HttpResponse) {

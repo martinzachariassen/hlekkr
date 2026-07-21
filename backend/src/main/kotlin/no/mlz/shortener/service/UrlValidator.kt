@@ -42,7 +42,7 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
             throw InvalidTargetUrlException("URLs with embedded credentials are not allowed")
         }
 
-        val host = uri.host?.trim('[', ']')?.lowercase()
+        val host = uri.host?.trim('[', ']')?.lowercase()?.trimEnd('.')?.takeIf { it.isNotEmpty() }
             ?: throw InvalidTargetUrlException("URL must include a host")
 
         if (isBlockedHostname(host)) {
@@ -70,9 +70,50 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
         host == "localhost" || host.endsWith(".localhost")
 
     private fun asIpLiteral(host: String): InetAddress? {
-        val looksLikeIp = host.contains(':') || IPV4_LITERAL.matches(host)
-        if (!looksLikeIp) return null
-        return runCatching { InetAddress.getByName(host) }.getOrNull()
+        // IPv6 literals: getByName parses the numeric form without a DNS lookup.
+        if (host.contains(':')) return runCatching { InetAddress.getByName(host) }.getOrNull()
+        return parseIpv4(host)
+    }
+
+    // Canonicalize an IPv4 literal the way a browser/inet_aton would — so alternate encodings
+    // (decimal 2130706433, hex 0x7f000001, octal 0177.0.0.1, short-form 10.1) all resolve to the
+    // address a client would actually reach, then get range-checked. Java's own getByName is NOT
+    // used here: it mis-reads a leading-zero part as decimal, not octal. Returns null for a genuine
+    // hostname (a non-numeric label), so no DNS is ever performed.
+    private fun parseIpv4(host: String): InetAddress? {
+        val parts = host.split('.')
+        if (parts.size > 4) return null
+        val values = parts.map { parseIpv4Part(it) ?: return null }
+        val maxPerPart = when (parts.size) {
+            1 -> longArrayOf(0xFFFFFFFFL)
+            2 -> longArrayOf(0xFF, 0xFFFFFF)
+            3 -> longArrayOf(0xFF, 0xFF, 0xFFFF)
+            else -> longArrayOf(0xFF, 0xFF, 0xFF, 0xFF)
+        }
+        var addr = 0L
+        for (i in values.indices) {
+            if (values[i] > maxPerPart[i]) return null
+            // Leading parts are one byte each; the final part fills the remaining low bytes.
+            val shift = if (i == values.lastIndex) 0 else 8 * (3 - i)
+            addr = addr or (values[i] shl shift)
+        }
+        val bytes = byteArrayOf(
+            (addr shr 24 and 0xFF).toByte(),
+            (addr shr 16 and 0xFF).toByte(),
+            (addr shr 8 and 0xFF).toByte(),
+            (addr and 0xFF).toByte(),
+        )
+        return runCatching { InetAddress.getByAddress(bytes) }.getOrNull()
+    }
+
+    private fun parseIpv4Part(part: String): Long? = try {
+        when {
+            part.startsWith("0x") -> part.substring(2).takeIf { it.isNotEmpty() }?.toLong(16)
+            part.length > 1 && part[0] == '0' -> part.toLong(8)
+            else -> part.toLong(10)
+        }
+    } catch (_: NumberFormatException) {
+        null
     }
 
     private fun isPrivateAddress(address: InetAddress): Boolean {
@@ -84,14 +125,17 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
         ) {
             return true
         }
-        // IPv6 unique-local (fc00::/7) is not covered by isSiteLocalAddress.
         val bytes = address.address
-        return bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC
+        // IPv6 unique-local (fc00::/7) is not covered by isSiteLocalAddress.
+        if (bytes.size == 16) return (bytes[0].toInt() and 0xFE) == 0xFC
+        val b0 = bytes[0].toInt() and 0xFF
+        val b1 = bytes[1].toInt() and 0xFF
+        return (b0 == 100 && b1 in 64..127) ||        // 100.64.0.0/10 carrier-grade NAT
+            bytes.all { (it.toInt() and 0xFF) == 255 } // 255.255.255.255 broadcast
     }
 
     companion object {
         const val MAX_LENGTH = 2048
         private val ALLOWED_SCHEMES = setOf("http", "https")
-        private val IPV4_LITERAL = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
     }
 }

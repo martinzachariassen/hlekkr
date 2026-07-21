@@ -16,6 +16,7 @@ import no.mlz.shortener.service.ClickTracker
 import no.mlz.shortener.service.LinkService
 import no.mlz.shortener.service.UrlValidator
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
@@ -35,6 +36,7 @@ class AppComponents(
     val redirectLimiter: TokenBucketRateLimiter,
     val maxBodyBytes: Long,
     val internalApiKey: String?,
+    val checkReadiness: () -> Boolean,
 )
 
 fun main() {
@@ -48,14 +50,14 @@ fun main() {
             migrationPassword = System.getenv("DATABASE_MIGRATION_PASSWORD"),
         )
     }
-    Runtime.getRuntime().addShutdownHook(Thread(database::close))
-
+    // Close the pool through the app's ordered stop sequence (after the final click flush), not a
+    // bare JVM hook that would race that flush and drop the last batch.
     embeddedServer(Netty, host = config.server.host, port = config.server.port) {
-        module(config, LinkRepository(database))
+        module(config, LinkRepository(database), onStopped = database::close)
     }.start(wait = true)
 }
 
-fun Application.module(config: AppConfig, repository: LinkRepository) {
+fun Application.module(config: AppConfig, repository: LinkRepository, onStopped: () -> Unit = {}) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val clickTracker = ClickTracker(repository, appScope).also { it.start() }
 
@@ -86,9 +88,14 @@ fun Application.module(config: AppConfig, repository: LinkRepository) {
 
     linkRoutes(components)
 
+    // Flush pending clicks (still needs the DB pool) before anything tears it down...
     monitor.subscribe(ApplicationStopping) {
         runBlocking { clickTracker.close() }
         appScope.cancel()
+    }
+    // ...then close external resources once the server has fully stopped.
+    monitor.subscribe(ApplicationStopped) {
+        onStopped()
     }
 }
 
@@ -118,5 +125,6 @@ private fun buildComponents(
         ),
         maxBodyBytes = config.app.maxBodyBytes,
         internalApiKey = config.app.internalApiKey,
+        checkReadiness = repository::ping,
     )
 }

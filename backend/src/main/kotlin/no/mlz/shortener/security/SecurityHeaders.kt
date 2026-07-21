@@ -6,14 +6,13 @@ import io.ktor.server.application.install
 import io.ktor.server.request.path
 import io.ktor.server.response.header
 
-// A JSON API serving no HTML, so the default CSP is maximally restrictive. The Swagger UI is the
-// one exception: its assets load from the unpkg CDN, so those paths get a CSP scoped to exactly that.
+// A JSON API serving no HTML, so the default CSP is maximally restrictive. The self-hosted Swagger
+// UI is the one exception: its assets are same-origin, so the docs CSP allows 'self' only (no CDN).
+// 'unsafe-inline' remains for Swagger UI's bootstrap script and the styles it injects at runtime.
 private const val API_CSP = "default-src 'none'"
-private const val SWAGGER_CDN = "https://unpkg.com"
 private const val DOCS_CSP =
-    "default-src 'none'; script-src 'self' 'unsafe-inline' $SWAGGER_CDN; " +
-        "style-src 'self' 'unsafe-inline' $SWAGGER_CDN; img-src 'self' data: $SWAGGER_CDN; " +
-        "font-src 'self' data: $SWAGGER_CDN; connect-src 'self'"
+    "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
 
 val SecurityHeaders = createApplicationPlugin(name = "SecurityHeaders") {
     onCall { call ->

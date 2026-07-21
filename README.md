@@ -85,9 +85,10 @@ reviewable, in keeping with the rest of the project.
 | -------- | --------------------- | ------------------------------- | ------------------------------------------------------------------------ |
 | `POST`   | `/links`              | frontend key (rate-limited)     | Body `{targetUrl, expiresAt?}` → `{code, shortUrl, ownerToken}`. `ownerToken` is shown **once**. |
 | `GET`    | `/{code}`             | **public**                      | `302` redirect. Records a click asynchronously. Generic `404` if missing/expired/deleted. |
-| `GET`    | `/links/{code}/stats` | frontend key + Bearer owner token | `{totalClicks, last7Days: [{date, count}]}`                            |
-| `DELETE` | `/links/{code}`       | frontend key + Bearer owner token | Soft delete.                                                            |
-| `GET`    | `/health`             | **public**                      | Liveness probe → `200 OK`.                                               |
+| `GET`    | `/links/{code}/stats` | frontend key + Bearer owner token (rate-limited) | `{totalClicks, last7Days: [{date, count}]}`                 |
+| `DELETE` | `/links/{code}`       | frontend key + Bearer owner token (rate-limited) | Soft delete.                                                |
+| `GET`    | `/health`             | **public**                      | Liveness probe → `200 OK` (no dependency checks).                        |
+| `GET`    | `/ready`              | **public**                      | Readiness probe → `200 READY`, or `503` if Postgres is unreachable. Railway's health check. |
 
 "frontend key" = the `X-Internal-Key` header described in [Restricting the API to your frontend](#restricting-the-api-to-your-frontend).
 It is unset (open) in local development.
@@ -356,8 +357,9 @@ cd backend
 - **End-to-end** (Ktor test client + Testcontainers): every endpoint plus the explicit security
   cases — dangerous schemes, private/metadata targets, oversized body → `413`, malformed JSON →
   clean `400`, missing/wrong owner token → `404`, missing/wrong service key → `404` (with the
-  redirect still public), rate limit → `429 + Retry-After`, the security headers, and that
-  `/health` and `/openapi.yaml` stay public.
+  redirect still public), rate limit → `429 + Retry-After` (create *and* stats), the security
+  headers, CORS scheme-pinning, the DB-backed readiness probe, the self-hosted (CDN-free) Swagger
+  UI, and that `/health` and `/openapi.yaml` stay public.
 
 CI (GitHub Actions) runs `./gradlew build` (compile + full test suite), a Trivy dependency
 scan that fails on any HIGH/CRITICAL CVE, `dependency-review` on PRs, OpenSSF Scorecard, and a

@@ -16,6 +16,11 @@ fun Application.configureCors(allowedOrigins: List<String>) {
         allowMethod(HttpMethod.Delete)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
-        allowedOrigins.forEach { origin -> allowHost(origin.removePrefix("https://").removePrefix("http://")) }
+        // Pin each entry to its own scheme; allowHost otherwise permits both http and https,
+        // silently widening an https-only entry to also accept the http origin.
+        allowedOrigins.forEach { origin ->
+            val scheme = origin.substringBefore("://", missingDelimiterValue = "https")
+            allowHost(origin.substringAfter("://"), schemes = listOf(scheme))
+        }
     }
 }

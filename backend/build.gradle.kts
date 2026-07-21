@@ -26,8 +26,8 @@ dependencies {
     implementation(libs.ktor.server.call.id)
     implementation(libs.ktor.server.default.headers)
     implementation(libs.ktor.server.config.yaml)
-    implementation(libs.ktor.server.swagger)
     implementation(libs.ktor.server.forwarded.header)
+    implementation(libs.swagger.ui)
 
     implementation(libs.hikari)
     implementation(libs.postgresql)

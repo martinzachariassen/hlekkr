@@ -54,6 +54,12 @@ class LinkRepository(private val database: Database) {
         ) > 0
     }
 
+    // Readiness probe: a live connection that answers a trivial query. Throws if the pool can't
+    // hand out a connection (DB down / unreachable); callers treat that as not-ready.
+    fun ping(): Boolean = database.withConnection { conn ->
+        conn.queryOne("SELECT 1", map = { it.getInt(1) }) == 1
+    }
+
     fun recordClicks(linkIds: List<Long>) {
         if (linkIds.isEmpty()) return
         database.withConnection { conn ->

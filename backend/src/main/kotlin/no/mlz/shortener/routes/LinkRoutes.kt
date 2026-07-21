@@ -1,6 +1,7 @@
 package no.mlz.shortener.routes
 
 import no.mlz.shortener.AppComponents
+import no.mlz.shortener.security.ClientRateKey
 import no.mlz.shortener.security.ServiceKey
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -32,13 +33,29 @@ fun Application.linkRoutes(components: AppComponents) {
     val service = components.linkService
 
     routing {
+        // Liveness: the process is up and serving. Cheap and dependency-free so a DB blip never
+        // triggers a restart. Readiness (can it serve traffic?) is a separate DB-backed probe.
         get("/health") { call.respondText("OK") }
 
-        // Management surface — gated on the internal key (see fromFrontend).
+        get("/ready") {
+            val ready = withContext(Dispatchers.IO) {
+                runCatching { components.checkReadiness() }.getOrDefault(false)
+            }
+            if (ready) {
+                call.respondText("READY")
+            } else {
+                call.respondText("NOT READY", status = HttpStatusCode.ServiceUnavailable)
+            }
+        }
+
+        // Management surface — gated on the internal key (see fromFrontend). All three touch the
+        // DB, so they carry the limiter too and run their blocking work off the request dispatcher.
         post("/links") {
             if (!fromFrontend(components) || !allow(components, isCreate = true)) return@post
             val request = receiveCreateRequest(components.maxBodyBytes)
-            val result = service.createLink(request.targetUrl, request.expiresAt)
+            val result = withContext(Dispatchers.IO) {
+                service.createLink(request.targetUrl, request.expiresAt)
+            }
             call.respond(
                 HttpStatusCode.Created,
                 CreateLinkResponse(result.code, result.shortUrl, result.ownerToken),
@@ -46,9 +63,10 @@ fun Application.linkRoutes(components: AppComponents) {
         }
 
         get("/links/{code}/stats") {
-            if (!fromFrontend(components)) return@get
+            if (!fromFrontend(components) || !allow(components, isCreate = false)) return@get
             val code = call.parameters["code"].orEmpty()
-            val stats = service.stats(code, bearerToken())
+            val token = bearerToken()
+            val stats = withContext(Dispatchers.IO) { service.stats(code, token) }
             call.respond(
                 StatsResponse(
                     totalClicks = stats.totalClicks,
@@ -58,9 +76,10 @@ fun Application.linkRoutes(components: AppComponents) {
         }
 
         delete("/links/{code}") {
-            if (!fromFrontend(components)) return@delete
+            if (!fromFrontend(components) || !allow(components, isCreate = false)) return@delete
             val code = call.parameters["code"].orEmpty()
-            service.delete(code, bearerToken())
+            val token = bearerToken()
+            withContext(Dispatchers.IO) { service.delete(code, token) }
             call.respond(HttpStatusCode.NoContent)
         }
 
@@ -68,7 +87,7 @@ fun Application.linkRoutes(components: AppComponents) {
         get("/{code}") {
             if (!allow(components, isCreate = false)) return@get
             val code = call.parameters["code"].orEmpty()
-            val target = service.resolveAndTrack(code)
+            val target = withContext(Dispatchers.IO) { service.resolveAndTrack(code) }
             call.respondRedirect(target, permanent = false)
         }
     }
@@ -85,7 +104,7 @@ private suspend fun RoutingContext.fromFrontend(components: AppComponents): Bool
 
 private suspend fun RoutingContext.allow(components: AppComponents, isCreate: Boolean): Boolean {
     val limiter = if (isCreate) components.createLimiter else components.redirectLimiter
-    val decision = limiter.check(call.request.origin.remoteHost)
+    val decision = limiter.check(ClientRateKey.of(call.request.origin.remoteHost))
     if (!decision.allowed) {
         call.response.header(HttpHeaders.RetryAfter, decision.retryAfterSeconds.toString())
         call.respond(
@@ -99,8 +118,9 @@ private suspend fun RoutingContext.allow(components: AppComponents, isCreate: Bo
 
 private fun RoutingContext.bearerToken(): String? {
     val header = call.request.headers[HttpHeaders.Authorization] ?: return null
-    if (!header.startsWith("Bearer ")) return null
-    return header.removePrefix("Bearer ").trim().takeIf { it.isNotEmpty() }
+    val prefix = "Bearer " // RFC 6750: the auth-scheme is case-insensitive.
+    if (!header.regionMatches(0, prefix, 0, prefix.length, ignoreCase = true)) return null
+    return header.substring(prefix.length).trim().takeIf { it.isNotEmpty() }
 }
 
 private suspend fun RoutingContext.receiveCreateRequest(maxBytes: Long): CreateLinkRequest {

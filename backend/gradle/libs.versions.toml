@@ -7,6 +7,7 @@ postgresql = "42.7.13"
 serialization = "1.11.0"
 coroutines = "1.11.0"
 logback = "1.5.38"
+swagger-ui = "5.25.3"
 junit = "5.14.4"
 mockk = "1.14.11"
 testcontainers = "1.21.4"
@@ -21,8 +22,10 @@ ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
 ktor-server-call-id = { module = "io.ktor:ktor-server-call-id", version.ref = "ktor" }
 ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
 ktor-server-config-yaml = { module = "io.ktor:ktor-server-config-yaml", version.ref = "ktor" }
-ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
 ktor-server-forwarded-header = { module = "io.ktor:ktor-server-forwarded-header", version.ref = "ktor" }
+
+# Swagger UI assets, vendored (served same-origin) rather than pulled from a CDN.
+swagger-ui = { module = "org.webjars:swagger-ui", version.ref = "swagger-ui" }
 
 hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
