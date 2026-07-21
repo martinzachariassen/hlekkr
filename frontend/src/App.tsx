@@ -51,8 +51,13 @@ export function App() {
       </main>
 
       <footer className="foot">
-        <span>Kotlin · Ktor · Postgres</span>
-        <span>No cookies · no cross-site tracking</span>
+        <span>
+          Built by{" "}
+          <a href="https://mlz.no" target="_blank" rel="noopener" data-umami-event="open-author">
+            Martin Zachariassen
+          </a>
+        </span>
+        <span>Kotlin · Ktor · Postgres · no cookies</span>
       </footer>
     </div>
   );
@@ -108,7 +113,7 @@ function CreateView({
       <div className="intro">
         <p className="eyebrow">
           <span className="dot" aria-hidden="true" />
-          No accounts · no tracking beyond a click count
+          Free · no sign-up · no tracking beyond a click count
         </p>
         <h1>Shorten a link.</h1>
         <p className="lede">

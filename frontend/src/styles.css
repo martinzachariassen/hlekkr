@@ -96,6 +96,17 @@ h1 {
 .foot span:last-child {
   text-align: right;
 }
+.foot a {
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.foot a:hover {
+  color: var(--accent-deep);
+  border-color: var(--accent);
+}
 
 .brand {
   display: inline-flex;
@@ -112,6 +123,11 @@ h1 {
   height: 13px;
   border-radius: 3px;
   background: var(--accent);
+  transition: transform 0.2s ease, border-radius 0.2s ease;
+}
+.brand:hover .brand-mark {
+  transform: scale(1.18) rotate(8deg);
+  border-radius: 4px;
 }
 .nav {
   display: flex;
@@ -122,6 +138,7 @@ h1 {
 }
 .nav a {
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 .nav a:hover,
 .linklike:hover {
@@ -136,6 +153,7 @@ h1 {
   color: var(--muted);
   font-family: var(--sans);
   font-size: 0.82rem;
+  transition: color 0.15s ease;
 }
 .linklike.accent {
   color: var(--accent-deep);
@@ -168,7 +186,7 @@ h1 {
 }
 .eyebrow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   margin: 0 0 16px;
   font-size: 0.7rem;
@@ -176,7 +194,10 @@ h1 {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* Pin the dot to the first line's cap height so it stays put when the label wraps. */
 .eyebrow .dot {
+  flex-shrink: 0;
+  margin-top: 0.42em;
   width: 6px;
   height: 6px;
   border-radius: 2px;
@@ -215,13 +236,14 @@ h1 {
   padding: 0 15px;
   flex: 1 1 260px;
   min-width: 0;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .field.grow {
   flex: 1 1 180px;
 }
 .field:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
 }
 .field input {
   flex: 1;
@@ -245,14 +267,22 @@ h1 {
   min-height: 52px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, filter 0.15s;
+  transition: background 0.15s, filter 0.15s, transform 0.12s ease, box-shadow 0.15s ease;
 }
 .btn:hover {
   filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px -8px rgba(26, 26, 24, 0.45);
+}
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 .btn:disabled {
   opacity: 0.6;
   cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 .btn.ghost {
   background: transparent;
@@ -338,6 +368,7 @@ h1 {
   font-weight: 700;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition: color 0.15s ease;
 }
 /* Codes and keys are read and typed character by character — a mono keeps 0/O and l/1 distinct. */
 #code,
@@ -356,6 +387,7 @@ h1 {
   font-family: var(--sans);
   font-size: 0.72rem;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 .copy:hover {
   border-color: var(--accent);
@@ -439,7 +471,41 @@ h1 {
   min-height: 2px;
   border-radius: 4px 4px 0 0;
   background: var(--accent);
+  transform-origin: bottom;
   transition: height 0.45s ease;
+  animation: barGrow 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+/* Stagger the seven columns so the week fills in left-to-right on reveal. */
+.bar-col:nth-child(1) .bar {
+  animation-delay: 0.08s;
+}
+.bar-col:nth-child(2) .bar {
+  animation-delay: 0.13s;
+}
+.bar-col:nth-child(3) .bar {
+  animation-delay: 0.18s;
+}
+.bar-col:nth-child(4) .bar {
+  animation-delay: 0.23s;
+}
+.bar-col:nth-child(5) .bar {
+  animation-delay: 0.28s;
+}
+.bar-col:nth-child(6) .bar {
+  animation-delay: 0.33s;
+}
+.bar-col:nth-child(7) .bar {
+  animation-delay: 0.38s;
+}
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 .bar-count,
 .bar-day {
@@ -480,9 +546,12 @@ h1 {
 
 /* Phones: stack the forms, shrink the display type, and keep everything one column. */
 @media (max-width: 560px) {
+  /* Flow from the top instead of centering in the viewport — no floaty gaps, predictable position.
+     The footer still pins to the bottom via the page grid's trailing auto row. */
   .stage {
-    gap: 22px;
-    padding: 24px 0;
+    justify-content: flex-start;
+    gap: 20px;
+    padding: 20px 0 32px;
   }
   h1 {
     font-size: clamp(2.4rem, 12vw, 3.4rem);
@@ -506,21 +575,58 @@ h1 {
   .btn {
     width: 100%;
   }
+
+  /* Stack each value over a full-width action instead of wrapping the button onto a ragged
+     half-line — the source of the awkward mobile wrapping. */
+  .result-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 15px;
+  }
+  .copy {
+    width: 100%;
+    padding: 12px;
+    font-size: 0.78rem;
+  }
+  .result-url {
+    font-size: 0.95rem;
+  }
+  .result-actions {
+    gap: 16px 24px;
+  }
+
+  /* Delete confirm: full-width destructive button, text links left-aligned beneath it. */
+  .danger {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .danger-label {
+    margin-bottom: 2px;
+  }
+  .btn.danger {
+    width: 100%;
+    min-height: 46px;
+  }
+  .danger .linklike {
+    padding: 6px 0;
+  }
+
   .foot {
     font-size: 0.64rem;
     gap: 10px;
   }
 }
 
-/* Small phones: let the header wrap and stack the footer rather than overflow. */
+/* Small phones: keep the header on one line by tightening it, and stack the footer. */
 @media (max-width: 400px) {
   .topbar {
-    flex-wrap: wrap;
-    gap: 4px 14px;
+    gap: 12px;
   }
   .nav {
     gap: 14px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
   }
   .foot {
     flex-direction: column;
