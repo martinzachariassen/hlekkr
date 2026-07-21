@@ -4,7 +4,8 @@
 [tools]
 java = "temurin-25"
 node = "lts"
-pnpm = "latest"
+# Pinned (not "latest") so local and CI resolve identical deps; matches package.json packageManager.
+pnpm = "10.11.0"
 
 # Derive the API's DB creds from the SAME source docker-compose uses (the git-ignored .env, if
 # present), falling back to the dev defaults baked into docker-compose.yml. One source of truth means

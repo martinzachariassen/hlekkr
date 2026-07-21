@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Single-screen web client for the security-hardened Kotlin URL shortener API.",
+  "packageManager": "pnpm@10.11.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
