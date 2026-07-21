@@ -62,12 +62,22 @@ fun Application.module(config: AppConfig, repository: LinkRepository, onStopped:
     val clickTracker = ClickTracker(repository, appScope).also { it.start() }
 
     val blocklist = HostBlocklist.from(config.app.blockedHosts.joinToString(","), config.app.blockedHostsFile)
-    if (blocklist.size > 0) environment.log.info("Loaded ${blocklist.size} blocked target domain(s).")
 
     val components = buildComponents(config, repository, clickTracker, blocklist)
     if (components.internalApiKey == null) {
         environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
     }
+
+    // Non-secret boot summary: leaves an auditable record of the effective security posture. Never
+    // add DB credentials, the connection string, or the internal key here.
+    environment.log.info(
+        "Shortener started: host=${config.server.host} port=${config.server.port} " +
+            "baseUrl=${config.app.baseUrl} auth=${if (components.internalApiKey != null) "enabled" else "OPEN"} " +
+            "trustProxyHeaders=${config.app.trustProxyHeaders} corsOrigins=${config.app.allowedOrigins.size} " +
+            "blockedDomains=${blocklist.size} " +
+            "rateLimit[create=${config.app.rateLimit.create.refillPerMinute}/min " +
+            "redirect=${config.app.rateLimit.redirect.refillPerMinute}/min]",
+    )
 
     // useLastProxy() takes the rightmost X-Forwarded-For entry (the one the trusted proxy appends)
     // so a client can't prepend a spoofed IP to escape its rate-limit bucket.

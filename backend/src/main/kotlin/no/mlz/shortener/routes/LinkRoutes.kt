@@ -21,6 +21,7 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 
 // Mapped to 413 in StatusPages.
@@ -28,6 +29,7 @@ class PayloadTooLargeException : RuntimeException()
 
 private const val INTERNAL_KEY_HEADER = "X-Internal-Key"
 private val json = Json { ignoreUnknownKeys = true }
+private val log = LoggerFactory.getLogger("no.mlz.shortener.routes")
 
 fun Application.linkRoutes(components: AppComponents) {
     val service = components.linkService
@@ -38,8 +40,14 @@ fun Application.linkRoutes(components: AppComponents) {
         get("/health") { call.respondText("OK") }
 
         get("/ready") {
+            val correlationId = call.callId ?: "unknown"
             val ready = withContext(Dispatchers.IO) {
-                runCatching { components.checkReadiness() }.getOrDefault(false)
+                runCatching { components.checkReadiness() }.getOrElse {
+                    // A red probe with no log reason is an operational blind spot; message only, no
+                    // stack trace, so a sustained outage doesn't flood the log every poll.
+                    log.warn("Readiness check failed: {} [{}]", it.message ?: it.javaClass.simpleName, correlationId)
+                    false
+                }
             }
             if (ready) {
                 call.respondText("READY")
