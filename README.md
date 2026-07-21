@@ -216,22 +216,23 @@ mise install     # first time only: fetch the pinned tools
 mise run dev      # API on :8080, web app on :5173 — Ctrl-C stops all
 ```
 
-`mise tasks` lists the rest (`mise run backend`, `mise run web`, `mise run test`, `mise run build`).
+`mise tasks` lists the rest — `mise run backend` (API only), `mise run web`, `mise run test`,
+`mise run lint`, `mise run build`, and the Docker shortcuts below.
 
-Prefer just the API? The Compose file ships dev-only defaults, so there is **nothing to
+Prefer just the API in Docker? The Compose file ships dev-only defaults, so there is **nothing to
 configure** for a first run:
 
 ```bash
-docker compose up --build      # or: make up
+mise run up      # docker compose up --build
 ```
 
 This starts Postgres 18, runs Flyway migrations under the admin role (a one-shot `flyway`
 service), then starts the API on `http://localhost:8080` under the least-privilege app role.
-Open [`/swagger`](http://localhost:8080/swagger) to explore it. `make` on its own lists the
-other shortcuts (`make test`, `make run`, `make logs`, …). To override any default (passwords,
-CORS, `INTERNAL_API_KEY`), copy `.env.example` to `.env` and edit.
+Open [`/swagger`](http://localhost:8080/swagger) to explore it. `mise run logs` tails it and
+`mise run down` tears it down. To override any default (passwords, CORS, `INTERNAL_API_KEY`), copy
+`.env.example` to `.env` and edit.
 
-Both `mise run dev` and `make run` run the API from source with migrations applied on startup
+Both `mise run dev` and `mise run backend` run the API from source with migrations applied on startup
 (using admin credentials) — convenient for local iteration. In containers that is turned off
 (`RUN_MIGRATIONS_ON_STARTUP=false`) because migrations are a separate privileged step.
 

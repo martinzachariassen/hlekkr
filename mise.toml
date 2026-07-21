@@ -47,9 +47,25 @@ description = "Run just the web app (expects the API already running)"
 dir = "frontend"
 run = "pnpm install --silent && pnpm dev"
 
+[tasks.up]
+description = "Run the whole stack in Docker (Postgres + migrations + API) on :8080"
+run = "docker compose up --build"
+
+[tasks.down]
+description = "Stop the Docker stack and remove its volumes"
+run = "docker compose down -v"
+
+[tasks.logs]
+description = "Tail the containerized API logs"
+run = "docker compose logs -f api"
+
 [tasks.test]
 description = "Run the backend test suite (unit + Testcontainers + e2e)"
 run = "cd backend && ./gradlew test"
+
+[tasks.lint]
+description = "Compile with all warnings as errors — the project's static-analysis gate"
+run = "cd backend && ./gradlew compileKotlin compileTestKotlin"
 
 [tasks.build]
 description = "Build backend jar and frontend bundle"
@@ -57,3 +73,7 @@ run = """
 cd backend && ./gradlew build
 cd frontend && pnpm install --silent && pnpm build
 """
+
+[tasks.clean]
+description = "Remove backend build outputs"
+run = "cd backend && ./gradlew clean"
