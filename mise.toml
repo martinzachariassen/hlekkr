@@ -20,13 +20,16 @@ run = """
 : "${DB_ADMIN_USER:=shortener_admin}"
 : "${DB_ADMIN_PASSWORD:=dev_admin_pw}"
 docker compose up -d --wait db
+# --no-daemon keeps the app JVM inside this task's process group, so the dev task's `kill 0` reaps it
+# on Ctrl-C. A daemon-forked JVM lives in the daemon's own group, survives, and squats on :8080 —
+# which then breaks the next `mise run dev` with "Address already in use".
 cd backend && \
   DATABASE_URL="jdbc:postgresql://localhost:5432/${POSTGRES_DB}" \
   DATABASE_USER="$APP_DB_USER" DATABASE_PASSWORD="$APP_DB_PASSWORD" \
   DATABASE_MIGRATION_USER="$DB_ADMIN_USER" DATABASE_MIGRATION_PASSWORD="$DB_ADMIN_PASSWORD" \
   BASE_URL="http://localhost:8080" \
   CORS_ALLOWED_ORIGINS="http://localhost:5173" \
-  ./gradlew -q --console=plain run
+  ./gradlew -q --console=plain --no-daemon run
 """
 
 [tasks.dev]
