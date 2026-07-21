@@ -51,8 +51,8 @@ export function App() {
       </main>
 
       <footer className="foot">
-        <span>59°N · 10°E</span>
-        <span>built on a security-hardened Kotlin API</span>
+        <span>Kotlin · Ktor · Postgres</span>
+        <span>No cookies · no cross-site tracking</span>
       </footer>
     </div>
   );
@@ -144,7 +144,7 @@ function CreateView({
       </form>
 
       <ul className="trust">
-        <li>random codes, not counted up</li>
+        <li>unsafe links blocked on submit</li>
         <li>your key stored hashed</li>
         <li>clicks counted, never profiled</li>
       </ul>

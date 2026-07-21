@@ -1,4 +1,4 @@
-/* Theme lifted from mlz.no: warm paper, near-black ink, a single teal accent, mono-first type. */
+/* Theme lifted from mlz.no: warm paper, near-black ink, a single teal accent; Inter + a serif display. */
 :root {
   --paper: #ecebe4;
   --paper-2: #e4e2da;
@@ -13,8 +13,8 @@
   --warn-bg: #f2e7cd;
   --warn-ink: #7a4e15;
   --warn-line: #d8b978;
-  /* Atkinson Hyperlegible: designed for maximum legibility. Body + UI. */
-  --sans: "Atkinson Hyperlegible", system-ui, sans-serif;
+  /* Inter: a calm, low-contrast grotesque built for screens. Body + UI. */
+  --sans: "Inter", system-ui, sans-serif;
   --serif: "Instrument Serif", Georgia, serif;
   /* Reserved for technical strings (codes, keys, short URLs) where 0/O and l/1 must not blur. */
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -35,6 +35,7 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   line-height: 1.55;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -72,7 +73,9 @@ h1 {
   min-height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  padding: 0 var(--gutter);
+  /* Respect notches / home indicators when viewport-fit=cover lets content reach the edges. */
+  padding: 0 max(var(--gutter), env(safe-area-inset-right)) env(safe-area-inset-bottom)
+    max(var(--gutter), env(safe-area-inset-left));
 }
 
 .topbar,
@@ -463,18 +466,80 @@ h1 {
   color: var(--danger);
 }
 
-@media (max-width: 560px) {
+/* ---- responsive ---- */
+/* Tablet / large phone: tighten the chrome so the header and footer never crowd. */
+@media (max-width: 720px) {
+  .topbar,
   .foot {
-    font-size: 0.64rem;
+    padding: 18px 0;
   }
-  .field-row {
+  .nav {
+    gap: 16px;
+  }
+}
+
+/* Phones: stack the forms, shrink the display type, and keep everything one column. */
+@media (max-width: 560px) {
+  .stage {
+    gap: 22px;
+    padding: 24px 0;
+  }
+  h1 {
+    font-size: clamp(2.4rem, 12vw, 3.4rem);
+  }
+  .lede {
+    max-width: none;
+  }
+  .field-row,
+  .field-row.wrap {
     flex-direction: column;
   }
-  .field-row.wrap {
-    flex-direction: row;
+  /* In a column the flex-basis becomes a *height*, so drop the row basis and size to content. */
+  .field,
+  .field.grow {
+    flex: 0 0 auto;
+  }
+  /* 16px keeps iOS from auto-zooming the viewport when an input is focused. */
+  .field input {
+    font-size: 16px;
   }
   .btn {
     width: 100%;
+  }
+  .foot {
+    font-size: 0.64rem;
+    gap: 10px;
+  }
+}
+
+/* Small phones: let the header wrap and stack the footer rather than overflow. */
+@media (max-width: 400px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .nav {
+    gap: 14px;
+    font-size: 0.8rem;
+  }
+  .foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .foot span:last-child {
+    text-align: left;
+  }
+}
+
+/* Touch devices: enlarge tap targets that are otherwise text-sized. */
+@media (hover: none) and (pointer: coarse) {
+  .nav a,
+  .nav .linklike {
+    padding: 6px 0;
+  }
+  .copy {
+    padding: 11px 15px;
   }
 }
 
