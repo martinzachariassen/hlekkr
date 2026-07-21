@@ -1,6 +1,8 @@
 name: CodeQL
 
 # Static analysis of the Kotlin/JVM code, results uploaded to the Security tab.
+# Uses build-mode: none (source-based extraction) so analysis doesn't depend on
+# the CodeQL Kotlin extractor keeping pace with the latest Kotlin compiler.
 on:
   push:
     branches: [main]
@@ -27,20 +29,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "25"
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: java-kotlin
-
-      - name: Build
-        working-directory: backend
-        run: ./gradlew compileKotlin compileTestKotlin --no-daemon
+          build-mode: none
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
