@@ -5,13 +5,9 @@ import java.net.InetAddress
 import java.net.URI
 import java.net.URISyntaxException
 
-// Rejecting loopback/private/metadata hosts is SSRF-preventive: this service doesn't fetch targets
-// today, but the checks mean adding a preview/screenshot feature later can't silently open a hole.
-// DNS is deliberately NOT resolved — only the literal host is validated; a future fetch must
-// re-validate the resolved address then, since it can change between now and fetch time.
-//
-// The blocklist adds content-policy filtering (adult/malware/phishing/... domains) on top of the
-// SSRF checks; it is empty unless configured, so by default only the SSRF rules apply.
+// SSRF-preventive: rejects loopback/private/link-local/metadata hosts so a later preview/fetch
+// feature can't be tricked into hitting internal services. DNS is deliberately not resolved — only
+// the literal host is checked; a future fetch must re-validate the resolved address, which can change.
 class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostBlocklist.empty()) {
 
     private val selfHost: String = runCatching { URI(baseUrl).host }
@@ -73,7 +69,6 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
     private fun isBlockedHostname(host: String): Boolean =
         host == "localhost" || host.endsWith(".localhost")
 
-    // Parses an IP literal without triggering DNS; null for hostnames.
     private fun asIpLiteral(host: String): InetAddress? {
         val looksLikeIp = host.contains(':') || IPV4_LITERAL.matches(host)
         if (!looksLikeIp) return null
@@ -81,10 +76,10 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
     }
 
     private fun isPrivateAddress(address: InetAddress): Boolean {
-        if (address.isLoopbackAddress ||       // 127.0.0.0/8, ::1
-            address.isLinkLocalAddress ||      // 169.254.0.0/16 (incl. cloud metadata), fe80::/10
-            address.isSiteLocalAddress ||      // 10/8, 172.16/12, 192.168/16
-            address.isAnyLocalAddress ||       // 0.0.0.0, ::
+        if (address.isLoopbackAddress ||
+            address.isLinkLocalAddress ||      // 169.254/16 incl. cloud metadata, fe80::/10
+            address.isSiteLocalAddress ||
+            address.isAnyLocalAddress ||
             address.isMulticastAddress
         ) {
             return true

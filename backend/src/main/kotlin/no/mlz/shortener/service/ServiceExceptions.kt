@@ -4,7 +4,7 @@ package no.mlz.shortener.service
 class InvalidTargetUrlException(val reason: String) : RuntimeException(reason)
 class InvalidRequestException(val reason: String) : RuntimeException(reason)
 
-// Undifferentiated on purpose (missing / expired / deleted / failed auth) so existence can't be probed.
+// Undifferentiated on purpose (missing/expired/deleted/failed auth) so existence can't be probed.
 class LinkNotFoundException : RuntimeException()
 
 class CodeGenerationException : RuntimeException("Could not allocate a unique short code")

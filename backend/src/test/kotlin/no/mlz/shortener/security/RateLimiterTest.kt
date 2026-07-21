@@ -46,7 +46,7 @@ class RateLimiterTest {
     @Test
     fun `retryAfter reflects the wait for one token`() {
         val limiter = limiter(capacity = 1, perMinute = 60) // 1/sec
-        limiter.check("ip") // drains the single token
+        limiter.check("ip")
         assertEquals(1, limiter.check("ip").retryAfterSeconds)
     }
 

@@ -6,9 +6,8 @@ import io.ktor.server.application.install
 import io.ktor.server.request.path
 import io.ktor.server.response.header
 
-// This is a JSON API that serves no HTML, so the default CSP is maximally restrictive. The Swagger
-// UI docs are the one exception: Ktor's plugin loads the swagger-ui assets from the unpkg CDN, so
-// those paths get a CSP that permits exactly that (and the same-origin spec fetch) and nothing else.
+// A JSON API serving no HTML, so the default CSP is maximally restrictive. The Swagger UI is the
+// one exception: its assets load from the unpkg CDN, so those paths get a CSP scoped to exactly that.
 private const val API_CSP = "default-src 'none'"
 private const val SWAGGER_CDN = "https://unpkg.com"
 private const val DOCS_CSP =

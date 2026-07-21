@@ -82,7 +82,6 @@ class UrlValidatorTest {
         assertThrows(InvalidTargetUrlException::class.java) {
             guarded.validate("https://cdn.blocked.example/y")
         }
-        // An unrelated host still passes.
         assertEquals("https://allowed.example/z", guarded.validate("https://allowed.example/z"))
     }
 

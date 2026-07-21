@@ -40,9 +40,8 @@ class AppComponents(
 fun main() {
     val config = AppConfig.load()
     val database = Database(config.db)
-    // In production, migrations run as a separate privileged step under the admin role; the app
-    // role has no DDL rights. Defaults to on so local `./gradlew run` bootstraps the schema in
-    // one command. See README §Database hardening.
+    // Off in production, where migrations are a separate privileged step (the app role has no DDL
+    // rights); on by default so local `./gradlew run` bootstraps the schema. See README §Database hardening.
     if (System.getenv("RUN_MIGRATIONS_ON_STARTUP")?.toBoolean() != false) {
         database.migrate(
             migrationUser = System.getenv("DATABASE_MIGRATION_USER"),
@@ -56,8 +55,6 @@ fun main() {
     }.start(wait = true)
 }
 
-// Takes a [LinkRepository] so tests hand in a Testcontainers-backed database while production
-// hands in the pooled one from [main].
 fun Application.module(config: AppConfig, repository: LinkRepository) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val clickTracker = ClickTracker(repository, appScope).also { it.start() }
@@ -70,9 +67,8 @@ fun Application.module(config: AppConfig, repository: LinkRepository) {
         environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
     }
 
-    // Behind Railway's edge the socket peer is the proxy, so the rate limiter would bucket every
-    // visitor together. useLastProxy() takes the rightmost X-Forwarded-For entry — the one the trusted
-    // proxy appends — so a client can't prepend a spoofed IP to escape its own bucket.
+    // useLastProxy() takes the rightmost X-Forwarded-For entry (the one the trusted proxy appends)
+    // so a client can't prepend a spoofed IP to escape its rate-limit bucket.
     if (config.app.trustProxyHeaders) {
         install(XForwardedHeaders) { useLastProxy() }
     }

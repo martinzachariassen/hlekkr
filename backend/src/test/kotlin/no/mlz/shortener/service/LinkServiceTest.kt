@@ -48,7 +48,7 @@ class LinkServiceTest {
         assertEquals("abc1234", result.code)
         assertEquals("https://sho.rt/abc1234", result.shortUrl)
         assertTrue(result.ownerToken.isNotBlank())
-        // The DB only ever sees the SHA-256 hash of the token, not the token itself.
+        // The DB only ever sees the SHA-256 hash, never the raw token.
         assertNotEquals(result.ownerToken, hashSlot.captured)
         assertEquals(OwnerToken.hash(result.ownerToken), hashSlot.captured)
     }

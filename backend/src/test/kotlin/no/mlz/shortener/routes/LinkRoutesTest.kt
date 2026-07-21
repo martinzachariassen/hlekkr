@@ -127,7 +127,7 @@ class LinkRoutesTest {
         val created = createLink("https://example.com")
         val client = jsonClient()
 
-        // Wrong / missing token -> 404 (not 403), so existence can't be probed.
+        // Wrong/missing token -> 404 (not 403), so existence can't be probed.
         assertEquals(HttpStatusCode.NotFound, client.get("/links/${created.code}/stats").status)
         assertEquals(
             HttpStatusCode.NotFound,
@@ -135,7 +135,6 @@ class LinkRoutesTest {
         )
         assertEquals(HttpStatusCode.NotFound, client.delete("/links/${created.code}").status)
 
-        // Correct token -> stats 200, delete 204, then gone.
         val auth = "Bearer ${created.ownerToken}"
         val stats = client.get("/links/${created.code}/stats") { header(HttpHeaders.Authorization, auth) }
         assertEquals(HttpStatusCode.OK, stats.status)
@@ -174,17 +173,16 @@ class LinkRoutesTest {
 
     @Test
     fun `sql injection payloads are inert`() = appTest {
-        // As a target URL: rejected as an invalid URL, no 500.
+        // As a target URL: rejected as invalid, no 500.
         val asTarget = jsonClient().post("/links") {
             contentType(ContentType.Application.Json)
             setBody("""{"targetUrl":"'; DROP TABLE links; --"}""")
         }
         assertEquals(HttpStatusCode.BadRequest, asTarget.status)
 
-        // As a path param: treated as a lookup key -> 404, table intact.
+        // As a path param: treated as a lookup key -> 404.
         assertEquals(HttpStatusCode.NotFound, jsonClient().get("/abc'--").status)
-        // A valid create still works afterwards, proving the table survived.
-        assertTrue(createLink("https://example.com").code.isNotBlank())
+        assertTrue(createLink("https://example.com").code.isNotBlank()) // table survived
     }
 
     @Test
@@ -260,7 +258,7 @@ class LinkRoutesTest {
         }
         assertEquals(HttpStatusCode.Created, created.status)
 
-        // The redirect stays public even when the key gate is on.
+        // Redirect stays public even when the key gate is on.
         val code = created.body<CreateLinkResponse>().code
         assertEquals(HttpStatusCode.Found, client.get("/$code").status)
     }

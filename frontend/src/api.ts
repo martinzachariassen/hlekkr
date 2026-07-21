@@ -1,6 +1,5 @@
-// Gated management calls (create/stats/delete). Dev: straight to the local API. Prod: "/api", so
-// they go same-origin through the Caddy proxy, which injects the internal key server-side — the key
-// never reaches the browser. See the project README (Deployment).
+// Prod points at "/api", same-origin through the Caddy proxy, which injects the internal key
+// server-side — the key never reaches the browser. See README §Deployment.
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/+$/, "");
 
 export interface CreatedLink {
@@ -23,7 +22,7 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   return { "Content-Type": "application/json", ...extra };
 }
 
-// The API never leaks internals; map its status codes to something a person can act on.
+// Map status codes to messages a person can act on; the API itself never leaks internals.
 async function toError(res: Response): Promise<Error> {
   let body: { error?: string; correlationId?: string } | null = null;
   try {
@@ -92,6 +91,5 @@ export async function deleteLink(code: string, token: string): Promise<void> {
   if (!res.ok) throw await toError(res);
 }
 
-// Swagger UI is same-origin in production (Caddy proxies /swagger to the private API); in local dev
-// the API runs on its own origin, so point straight at it there.
+// Same-origin in prod (Caddy proxies /swagger); point at the API's own origin in local dev.
 export const apiDocsUrl = /^https?:\/\//.test(API_BASE) ? `${API_BASE}/swagger` : "/swagger";

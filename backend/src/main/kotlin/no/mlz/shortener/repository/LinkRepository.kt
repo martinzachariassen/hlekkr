@@ -17,7 +17,6 @@ data class DailyClickCount(val date: LocalDate, val count: Long)
 // Code collided with an existing row on insert (SQLSTATE 23505).
 class DuplicateCodeException : RuntimeException()
 
-// Every method binds parameters via PreparedStatement — no user input is concatenated into SQL.
 class LinkRepository(private val database: Database) {
 
     fun insert(
@@ -76,7 +75,7 @@ class LinkRepository(private val database: Database) {
         ) ?: 0L
     }
 
-    // Ascending, UTC; days with zero clicks are simply absent.
+    // Ascending, UTC; zero-click days are absent from the result.
     fun clicksLast7Days(linkId: Long): List<DailyClickCount> = database.withConnection { conn ->
         conn.query(
             "SELECT (clicked_at AT TIME ZONE 'UTC')::date AS d, count(*) AS c " +

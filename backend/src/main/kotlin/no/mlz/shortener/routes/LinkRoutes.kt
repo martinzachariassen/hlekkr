@@ -34,7 +34,7 @@ fun Application.linkRoutes(components: AppComponents) {
     routing {
         get("/health") { call.respondText("OK") }
 
-        // Management surface — only the frontend (holds the internal key) may reach these.
+        // Management surface — gated on the internal key (see fromFrontend).
         post("/links") {
             if (!fromFrontend(components) || !allow(components, isCreate = true)) return@post
             val request = receiveCreateRequest(components.maxBodyBytes)
@@ -74,8 +74,8 @@ fun Application.linkRoutes(components: AppComponents) {
     }
 }
 
-// Rejects any caller lacking the configured internal key with a generic 404 (never revealing that
-// the route exists). Open when no key is configured, for local development.
+// A missing/wrong internal key gets a generic 404, never revealing the route exists. Open when no
+// key is configured (local dev).
 private suspend fun RoutingContext.fromFrontend(components: AppComponents): Boolean {
     val expected = components.internalApiKey ?: return true
     if (ServiceKey.matches(call.request.headers[INTERNAL_KEY_HEADER], expected)) return true
@@ -83,7 +83,6 @@ private suspend fun RoutingContext.fromFrontend(components: AppComponents): Bool
     return false
 }
 
-// Applies the appropriate token bucket; on denial writes 429 + Retry-After and returns false.
 private suspend fun RoutingContext.allow(components: AppComponents, isCreate: Boolean): Boolean {
     val limiter = if (isCreate) components.createLimiter else components.redirectLimiter
     val decision = limiter.check(call.request.origin.remoteHost)

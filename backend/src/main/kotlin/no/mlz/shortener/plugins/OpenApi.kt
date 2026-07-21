@@ -10,8 +10,7 @@ import io.ktor.server.routing.routing
 
 private const val SPEC_RESOURCE = "openapi/documentation.yaml"
 
-// Hand-authored OpenAPI spec, served as raw YAML and via Swagger UI. Both are public: the spec
-// is the contract, not data, and this is a portfolio API meant to be explorable.
+// Hand-authored OpenAPI spec, served as raw YAML and via Swagger UI — both public by design.
 fun Application.configureOpenApi() {
     val spec = environment.classLoader.getResource(SPEC_RESOURCE)?.readText()
     routing {

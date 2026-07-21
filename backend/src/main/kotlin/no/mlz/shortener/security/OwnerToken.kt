@@ -4,14 +4,14 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 
-// The whole authorization model: no accounts, just a bearer secret returned once at creation.
-// Only the SHA-256 hash is stored; the raw token is never persisted and must never be logged.
+// The whole authorization model: no accounts, just a bearer secret returned once at creation. Only
+// its SHA-256 hash is stored; the raw token is never persisted and must never be logged.
 object OwnerToken {
 
     private val random = SecureRandom()
     private val encoder = Base64.getUrlEncoder().withoutPadding()
 
-    private const val TOKEN_BYTES = 32 // 256 bits, well above the 128-bit floor
+    private const val TOKEN_BYTES = 32 // 256 bits
 
     fun generate(): String {
         val bytes = ByteArray(TOKEN_BYTES)

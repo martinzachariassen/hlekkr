@@ -44,6 +44,17 @@ mise run up / down / logs   # the whole stack in Docker
 convenience; containers turn that off (`RUN_MIGRATIONS_ON_STARTUP=false`) because
 migrations are a separate privileged step there.
 
+## Comments
+
+Keep them to an absolute minimum, in both apps. Explain **why**, never **what** —
+the code already says what, so don't restate the line below or narrate obvious
+steps. A comment earns its place only for the genuinely non-obvious: a security
+posture that isn't visible in the call (the 404-not-403 probe defense, constant-time
+compares), a concurrency subtlety, a deliberate gotcha (why Shadow over buildFatJar),
+or a magic value's meaning (`62^7` collision space). When one does earn its place,
+keep it short. Prefer a clear name or small refactor over a comment; leave no
+commented-out code behind.
+
 ## Backend conventions
 
 - **Wiring is explicit, not magic.** `Application.kt` installs every Ktor plugin,

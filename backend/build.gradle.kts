@@ -65,8 +65,8 @@ tasks.test {
     }
 }
 
-// Package with Shadow rather than Ktor's buildFatJar so that duplicate META-INF/services
-// files (notably Flyway's plugin registry) are concatenated, not overwritten.
+// Shadow, not Ktor's buildFatJar, so duplicate META-INF/services files (notably Flyway's registry)
+// are concatenated rather than overwritten.
 tasks.shadowJar {
     archiveClassifier.set("all")
     mergeServiceFiles()

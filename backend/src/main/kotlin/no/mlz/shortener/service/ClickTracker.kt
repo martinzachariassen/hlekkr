@@ -12,9 +12,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 
 // Keeps click writes off the redirect hot path: record() drops the id on a bounded channel and a
-// single background coroutine batches inserts. A crash between enqueue and flush loses at most one
-// un-flushed batch — fine for analytics counts, not for billing-grade data. Under sustained
-// overflow the oldest queued events are dropped rather than blocking redirects.
+// single background coroutine batches inserts. Overflow drops oldest rather than blocking redirects,
+// and a crash loses at most one un-flushed batch — acceptable for analytics counts, not billing.
 class ClickTracker(
     private val repository: LinkRepository,
     private val scope: CoroutineScope,
@@ -61,12 +60,11 @@ class ClickTracker(
         try {
             withContext(Dispatchers.IO) { repository.recordClicks(linkIds) }
         } catch (e: Exception) {
-            // Losing analytics counts must never crash the consumer or the app.
+            // A failed flush must never crash the consumer or the app.
             log.warn("Failed to flush {} click events", linkIds.size, e)
         }
     }
 
-    // Stops accepting clicks and drains what is already queued.
     suspend fun close() {
         channel.close()
         consumer?.join()

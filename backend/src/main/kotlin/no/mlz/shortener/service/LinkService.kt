@@ -38,7 +38,7 @@ class LinkService(
                 repository.insert(code, targetUrl, ownerTokenHash, expiresAt)
                 return CreateLinkResult(code, "$baseUrl/$code", ownerToken)
             } catch (_: DuplicateCodeException) {
-                // Collision — try a fresh code; fail closed once attempts are exhausted.
+                // Collision — retry with a fresh code.
             }
         }
         throw CodeGenerationException()

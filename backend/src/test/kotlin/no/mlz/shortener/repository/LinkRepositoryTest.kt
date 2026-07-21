@@ -74,15 +74,14 @@ class LinkRepositoryTest {
     @Test
     fun `treats a sql injection payload as inert data`() {
         val payload = "'; DROP TABLE links; --"
-        // Stored as an ordinary string, both as a value and later queried as a path param.
         repository.insert("evil123", payload, "h".repeat(64), null)
 
         val found = repository.findLive("evil123")
         assertEquals(payload, found?.targetUrl)
 
-        // Querying with the payload as the code must not execute anything: returns null, table intact.
+        // Querying with the payload as the code executes nothing: null, and the table is intact.
         assertNull(repository.findLive(payload))
-        assertNotNull(repository.findLive("evil123")) // links table still exists and has data
+        assertNotNull(repository.findLive("evil123"))
     }
 
     @Test
@@ -93,8 +92,7 @@ class LinkRepositoryTest {
         repository.insert("delete1", "https://example.com", "h".repeat(64), null)
         assertTrue(repository.softDelete("delete1"))
         assertNull(repository.findLive("delete1"))
-        // A second soft-delete is a no-op.
-        assertFalse(repository.softDelete("delete1"))
+        assertFalse(repository.softDelete("delete1")) // second soft-delete is a no-op
     }
 
     @Test

@@ -6,8 +6,7 @@ import kotlin.math.ceil
 import kotlin.math.min
 
 // In-memory, per-IP token bucket: `capacity` = burst, `refillPerMinute` = sustained rate. State is
-// single-instance and does NOT survive horizontal scaling — a scaled deployment moves this to
-// Redis. `nanoTime` is injected so refill logic is deterministically testable.
+// single-instance — a scaled deployment must move this to Redis. `nanoTime` is injected for tests.
 class TokenBucketRateLimiter(
     private val capacity: Long,
     refillPerMinute: Long,
@@ -20,13 +19,12 @@ class TokenBucketRateLimiter(
     private val buckets = ConcurrentHashMap<String, Bucket>()
 
     fun check(key: String): Decision {
-        // A bucket that has refilled to capacity is indistinguishable from a key we've never seen, so
-        // dropping full ones is lossless and caps memory against IP churn (e.g. spoofed/rotating IPs).
+        // A full bucket is indistinguishable from an unseen key, so dropping full ones is lossless
+        // and caps memory against IP churn (e.g. spoofed/rotating IPs).
         if (buckets.size >= maxEntries) buckets.values.removeIf { it.isReplenished() }
         return buckets.computeIfAbsent(key) { Bucket(capacity.toDouble(), nanoTime()) }.tryConsume()
     }
 
-    // Visible for tests: number of buckets currently tracked.
     internal fun trackedKeys(): Int = buckets.size
 
     private inner class Bucket(private var tokens: Double, private var lastRefill: Long) {

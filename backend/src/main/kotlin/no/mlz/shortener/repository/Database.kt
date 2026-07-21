@@ -9,9 +9,8 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import javax.sql.DataSource
 
-// Owns the HikariCP pool and hand-written query helpers. No ORM: every statement is a
-// PreparedStatement with bound params (see Connection.query / update) — nothing interpolates
-// user input into SQL.
+// Owns the HikariCP pool and the query helpers below. No ORM: every statement is a parameterized
+// PreparedStatement — nothing interpolates user input into SQL.
 class Database(dbConfig: AppConfig.DbConfig) : AutoCloseable {
 
     val dataSource: HikariDataSource = HikariDataSource(
@@ -22,14 +21,13 @@ class Database(dbConfig: AppConfig.DbConfig) : AutoCloseable {
             maximumPoolSize = dbConfig.maxPoolSize
             connectionTimeout = dbConfig.connectionTimeoutMs
             poolName = "shortener-pool"
-            // Bound every statement server-side so a runaway query can't pin a connection forever.
+            // Server-side bound so a runaway query can't pin a connection forever.
             connectionInitSql = "SET statement_timeout = ${dbConfig.statementTimeoutMs}"
         },
     )
 
-    // The app dataSource is a DML-only role that can't create tables, so migrations run under a
-    // separate privileged role when its credentials are supplied. When absent they reuse the app
-    // datasource — convenient for local `./gradlew run`.
+    // The app role is DML-only and can't create tables, so migrations run under a separate
+    // privileged role when supplied; absent, they reuse the app datasource (local `./gradlew run`).
     fun migrate(migrationUser: String? = null, migrationPassword: String? = null) {
         if (migrationUser != null && migrationPassword != null) {
             migrationDataSource(migrationUser, migrationPassword).use { runFlyway(it) }

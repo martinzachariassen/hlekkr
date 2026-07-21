@@ -12,7 +12,7 @@ data class CreateLinkRequest(
 data class CreateLinkResponse(
     val code: String,
     val shortUrl: String,
-    // Shown exactly once. Store it to manage or delete the link later; it is never retrievable again.
+    // Shown exactly once; never retrievable again.
     val ownerToken: String,
 )
 
