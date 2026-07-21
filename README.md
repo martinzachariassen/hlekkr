@@ -5,15 +5,16 @@ with **raw JDBC** (no ORM) over **PostgreSQL**. This is a portfolio project: the
 show reasoning about persistence, concurrency, and security without a framework hiding the
 decisions.
 
-The repository is a monorepo. The backend lives in [`backend/`](backend); a web client will
-be added later under [`frontend/`](frontend) as an independent app.
+The repository is a monorepo. The backend lives in [`backend/`](backend); the web client
+that consumes it lives in [`frontend/`](frontend) as an independent app.
 
 ```
 url-shortener/
 ├── backend/     # Ktor API (this project)
-├── frontend/    # reserved for the web client (later)
+├── frontend/    # single-screen web client (Vite + React + TS)
+├── mise.toml    # one-command dev stack + pinned toolchain
 ├── docker-compose.yml
-└── .github/     # CI: build/test, dependency scan, scorecard
+└── .github/     # CI: build/test, dependency scan, scorecard, frontend build
 ```
 
 ## Contents
@@ -23,6 +24,7 @@ url-shortener/
 - [API](#api)
 - [Security decisions](#security-decisions)
 - [Restricting the API to your frontend](#restricting-the-api-to-your-frontend)
+- [Frontend](#frontend)
 - [Running locally](#running-locally)
 - [Deploying to Railway](#deploying-to-railway)
 - [Testing](#testing)
@@ -189,9 +191,30 @@ key answers *"is this the frontend?"* and the owner token answers *"does this ca
 link?"*. Locally, leaving `INTERNAL_API_KEY` unset disables the gate (the app logs a warning at
 startup) so development stays friction-free.
 
+## Frontend
+
+A single-screen web client (Vite + React + TypeScript) lives in [`frontend/`](frontend): paste a
+URL to get a short one plus a one-time owner key, then look a link up by code + key to see clicks
+or delete it. The whole thing fits one non-scrolling screen — result and stats states swap in
+place. The theme (warm paper, teal accent, mono-first type) borrows from [mlz.no](https://mlz.no).
+
+Privacy is the pitch, so analytics is opt-in: it integrates [Umami](https://umami.is) (cookieless),
+but ships **zero** analytics code unless `VITE_UMAMI_SRC` / `VITE_UMAMI_WEBSITE_ID` are set. See
+[`frontend/README.md`](frontend/README.md) for its configuration.
+
 ## Running locally
 
-Requires JDK 25 and Docker. The Compose file ships dev-only defaults, so there is **nothing to
+With [mise](https://mise.jdx.dev) installed, one command pins the toolchain (java/node/pnpm) and
+brings up **everything** — Postgres, the API from source, and the web app:
+
+```bash
+mise install     # first time only: fetch the pinned tools
+mise run dev      # API on :8080, web app on :5173 — Ctrl-C stops all
+```
+
+`mise tasks` lists the rest (`mise run backend`, `mise run web`, `mise run test`, `mise run build`).
+
+Prefer just the API? The Compose file ships dev-only defaults, so there is **nothing to
 configure** for a first run:
 
 ```bash
@@ -204,15 +227,9 @@ Open [`/swagger`](http://localhost:8080/swagger) to explore it. `make` on its ow
 other shortcuts (`make test`, `make run`, `make logs`, …). To override any default (passwords,
 CORS, `INTERNAL_API_KEY`), copy `.env.example` to `.env` and edit.
 
-To run the app from source against just the database:
-
-```bash
-make run     # starts Postgres, then `./gradlew run` with the right env wired in
-```
-
-There the app applies migrations itself on startup (using admin credentials) — convenient for
-local iteration. In containers that is turned off (`RUN_MIGRATIONS_ON_STARTUP=false`) because
-migrations are a separate privileged step.
+Both `mise run dev` and `make run` run the API from source with migrations applied on startup
+(using admin credentials) — convenient for local iteration. In containers that is turned off
+(`RUN_MIGRATIONS_ON_STARTUP=false`) because migrations are a separate privileged step.
 
 ## Deploying to Railway
 
