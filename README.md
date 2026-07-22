@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🔗 short
+# 🔗 Hlekkr
+
+*Old Norse for "link / chain" — a direct hit for a service that makes links.*
 
 **A link shortener that doesn't track you.** Paste a URL, get a short one back —
 no accounts, no logins, clicks counted but never profiled. Built as a portfolio
@@ -23,14 +25,14 @@ JDBC and a framework-free [React](https://react.dev) client.
 [**Live site**](https://short.mlz.no) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
 
 <a href="https://short.mlz.no">
-  <img src="frontend/public/assets/social/og.png" alt="short — a link shortener that doesn't track you" width="640" />
+  <img src="frontend/public/assets/social/og.png" alt="Hlekkr — a link shortener that doesn't track you" width="640" />
 </a>
 
 </div>
 
 ## What it is
 
-**short** turns a long URL into a 7-character link and counts the clicks — that's
+**Hlekkr** turns a long URL into a 7-character link and counts the clicks — that's
 the whole product. The interesting part is *how* it's built. There's no Spring, no
 ORM, no auto-configuration: every plugin, query, and dependency is wired by hand so
 the reasoning behind each persistence, concurrency, and security decision stays

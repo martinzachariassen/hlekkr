@@ -20,9 +20,9 @@ export function App() {
   return (
     <div className="page">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="short — home" data-umami-event="open-home">
+        <a className="brand" href="/" aria-label="Hlekkr — home" data-umami-event="open-home">
           <span className="brand-mark" aria-hidden="true" />
-          short
+          Hlekkr
         </a>
         <nav className="nav">
           <button

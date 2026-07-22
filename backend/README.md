@@ -1,4 +1,4 @@
-# backend — URL shortener API
+# backend — Hlekkr API
 
 Kotlin + [Ktor](https://ktor.io) (Netty) over raw JDBC and PostgreSQL.
 

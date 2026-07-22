@@ -1,4 +1,4 @@
-# frontend — web client
+# frontend — Hlekkr web client
 
 A single-screen client (Vite + React + TypeScript, no UI framework) for the backend API,
 served in production by Caddy — the stack's only public service.
