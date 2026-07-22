@@ -75,6 +75,7 @@ function CreateView({
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waking, setWaking] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -92,8 +93,9 @@ function CreateView({
     }
 
     setBusy(true);
+    setWaking(false);
     try {
-      const link = await shorten(raw);
+      const link = await shorten(raw, undefined, { onWaking: () => setWaking(true) });
       setCreated(link);
       track("shorten-success");
     } catch (err) {
@@ -101,6 +103,7 @@ function CreateView({
       track("shorten-error");
     } finally {
       setBusy(false);
+      setWaking(false);
     }
   }
 
@@ -140,11 +143,14 @@ function CreateView({
             />
           </div>
           <button type="submit" className="btn" disabled={busy} data-umami-event="shorten">
-            {busy ? "Shortening…" : "Shorten →"}
+            {busy ? (waking ? "Waking server…" : "Shortening…") : "Shorten →"}
           </button>
         </div>
         <p className={`msg error${error ? " show" : ""}`} role="alert">
           {error}
+        </p>
+        <p className={`msg${waking ? " show" : ""}`} role="status">
+          Waking the server — the first request after a quiet spell can take up to ~30s.
         </p>
       </form>
 
@@ -218,6 +224,7 @@ function ManageView({ seed }: { seed: CreatedLink | null }) {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waking, setWaking] = useState(false);
 
   const lookup = useCallback(async () => {
     setError("");
@@ -227,21 +234,24 @@ function ManageView({ seed }: { seed: CreatedLink | null }) {
       return;
     }
     setBusy(true);
+    setWaking(false);
     try {
-      setStats(await fetchStats(code.trim(), token.trim()));
+      setStats(await fetchStats(code.trim(), token.trim(), { onWaking: () => setWaking(true) }));
       track("stats-view");
     } catch (err) {
       setStats(null);
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setBusy(false);
+      setWaking(false);
     }
   }, [code, token]);
 
   async function onDelete() {
     setBusy(true);
+    setWaking(false);
     try {
-      await deleteLink(code.trim(), token.trim());
+      await deleteLink(code.trim(), token.trim(), { onWaking: () => setWaking(true) });
       setStats(null);
       setStatus("Deleted — this link no longer redirects.");
       track("delete-success");
@@ -249,6 +259,7 @@ function ManageView({ seed }: { seed: CreatedLink | null }) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setBusy(false);
+      setWaking(false);
     }
   }
 
@@ -300,14 +311,14 @@ function ManageView({ seed }: { seed: CreatedLink | null }) {
             />
           </div>
           <button type="submit" className="btn ghost" disabled={busy} data-umami-event="stats-lookup">
-            {busy ? "…" : "Look up"}
+            {busy ? (waking ? "Waking…" : "…") : "Look up"}
           </button>
         </div>
         <p className={`msg error${error ? " show" : ""}`} role="alert">
           {error}
         </p>
-        <p className={`msg${status ? " show" : ""}`} role="status">
-          {status}
+        <p className={`msg${waking ? " show" : status ? " show" : ""}`} role="status">
+          {waking ? "Waking the server — first request after a quiet spell can take up to ~30s." : status}
         </p>
 
         {stats && <StatsPanel stats={stats} busy={busy} onDelete={onDelete} />}

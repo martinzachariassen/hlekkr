@@ -18,6 +18,29 @@
 	admin off
 	auto_https off
 	persist_config off
+
+	# Railway fronts this container with its own edge proxy, so the real client IP arrives in
+	# X-Forwarded-For behind one or more private-network hops. Trust those hops so that
+	# {http.request.client_ip} resolves to the true client rather than a proxy address.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# Shared upstream options for every route proxied to the private API. Two jobs:
+#   - Pin X-Forwarded-For to the real client IP so the API's per-IP rate limiter buckets each
+#     visitor separately, not the whole world under one proxy address. The API must run with
+#     TRUST_PROXY_HEADERS=true (and SERVER_HOST=::) to read it — see backend/.env.example.
+#   - Ride out cold starts: Railway may idle the API to zero, so hold and retry the dial for a
+#     window rather than 502 the instant it's still booting.
+(api_transport) {
+	header_up X-Forwarded-For {http.request.client_ip}
+	lb_try_duration 20s
+	lb_try_interval 500ms
+	transport http {
+		dial_timeout 5s
+		response_header_timeout 20s
+	}
 }
 
 :{$PORT:8080} {
@@ -28,6 +51,7 @@
 	handle_path /api/* {
 		reverse_proxy {$API_UPSTREAM} {
 			header_up X-Internal-Key {$INTERNAL_API_KEY}
+			import api_transport
 		}
 	}
 
@@ -36,14 +60,18 @@
 	# needs its own regex matcher, so it gets a separate handle block.
 	@docs path /openapi.yaml /swagger /swagger/*
 	handle @docs {
-		reverse_proxy {$API_UPSTREAM}
+		reverse_proxy {$API_UPSTREAM} {
+			import api_transport
+		}
 	}
 
 	# The public short-link redirect. This matcher is coupled to the backend's code length
 	# (7-char base62) — keep in sync with app.code.length.
 	@code path_regexp ^/[0-9A-Za-z]{7}$
 	handle @code {
-		reverse_proxy {$API_UPSTREAM}
+		reverse_proxy {$API_UPSTREAM} {
+			import api_transport
+		}
 	}
 
 	# Everything else is the static single-page app.
