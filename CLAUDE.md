@@ -4,8 +4,9 @@ How to work in this repo — a security-hardened URL shortener, built as a portf
 project to *show the reasoning* behind persistence, concurrency, and security
 without a framework hiding the decisions. Read this before proposing changes; the
 [README](README.md) carries the full architecture and the rationale behind every
-security choice, and [`backend/README.md`](backend/README.md) /
-[`frontend/README.md`](frontend/README.md) cover each app.
+security choice, and [`docs/backend.md`](docs/backend.md) /
+[`docs/frontend.md`](docs/frontend.md) cover each app in depth (the per-app READMEs
+are short pointers to those).
 
 > General working defaults (git, code style, communication) come from the global
 > agent config outside this repo. This file covers what's specific to this project,

@@ -156,6 +156,7 @@ url-shortener/
 ├── frontend/                    # single-screen web client (Vite + React + TS)
 │   ├── src/                     # components + one stylesheet
 │   └── Caddyfile                # the single public entrypoint (prod)
+├── docs/                        # per-app guides (backend, frontend) + deployment notes
 ├── mise.toml                    # pinned toolchain + one-command dev stack
 ├── docker-compose.yml           # Postgres + Flyway + API
 └── .github/                     # CI: build/test, CodeQL, Trivy, Scorecard, blocklist refresh
