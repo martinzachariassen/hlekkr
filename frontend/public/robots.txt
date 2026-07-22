@@ -1,4 +1,4 @@
-# short — https://short.up.railway.app
+# short — https://short.mlz.no
 # Crawl the landing page; keep the management API and API docs out of indexes.
 # Short-link redirect codes are random and unlinked, so there's nothing to enumerate.
 User-agent: *
@@ -8,4 +8,4 @@ Disallow: /swagger
 Disallow: /swagger/
 Disallow: /openapi.yaml
 
-Sitemap: https://short.up.railway.app/sitemap.xml
+Sitemap: https://short.mlz.no/sitemap.xml
