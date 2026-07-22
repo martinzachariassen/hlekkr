@@ -126,7 +126,7 @@ mise run test                 # or: cd backend && ./gradlew build
 - CI (`.github/workflows/`) runs `./gradlew build` (compile + full suite), a Trivy
   scan that **fails on any HIGH/CRITICAL CVE**, `dependency-review` on PRs, OpenSSF
   Scorecard, and a Conventional-Commit PR-title check.
-- Tests: unit (JUnit 5 + MockK), repository (Testcontainers, real Postgres 18), and
+- Tests: unit (JUnit 6 + MockK), repository (Testcontainers, real Postgres 18), and
   e2e (Ktor test client). The security cases are part of the suite — keep them.
 - A dedicated SAST scanner (CodeQL/detekt) is intentionally not wired in yet: neither
   supports the JDK 25 + Kotlin 2.4 toolchain as of writing. Don't add one until it

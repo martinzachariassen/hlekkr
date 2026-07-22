@@ -134,7 +134,7 @@ cd backend
 ./gradlew build test
 ```
 
-- **Unit** (JUnit 5 + MockK): `UrlValidator`, `LinkService`, `CodeGenerator`, rate limiter,
+- **Unit** (JUnit 6 + MockK): `UrlValidator`, `LinkService`, `CodeGenerator`, rate limiter,
   owner-token hashing, and the service-key constant-time compare.
 - **Repository** (Testcontainers, real Postgres 18): parameterized queries, uniqueness,
   soft-delete/expiry filtering, click aggregation, and a `'; DROP TABLE links; --`

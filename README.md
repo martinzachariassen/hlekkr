@@ -216,7 +216,7 @@ troubleshooting, live in [`docs/deployment.md`](docs/deployment.md).
 
 ## Testing & CI
 
-Three test layers, all run by `./gradlew build` (or `mise run test`): **unit** (JUnit 5 +
+Three test layers, all run by `./gradlew build` (or `mise run test`): **unit** (JUnit 6 +
 MockK), **repository** (Testcontainers against a real Postgres 18, including a
 `'; DROP TABLE links; --` inertness test), and **end-to-end** (Ktor test client) covering
 every endpoint and every security case from the table above. The full test inventory is in
