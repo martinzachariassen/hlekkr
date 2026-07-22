@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "short — a link shortener that doesn't track you",
-  "short_name": "short",
+  "name": "Hlekkr — a link shortener that doesn't track you",
+  "short_name": "Hlekkr",
   "description": "Paste a URL, get a short one back. No accounts, no logins — clicks are counted, never profiled.",
   "start_url": "/",
   "scope": "/",

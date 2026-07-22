@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: URL Shortener API
+  title: Hlekkr — URL Shortener API
   version: 1.0.0
   description: >
-    A security-hardened URL shortener.
+    A security-hardened URL shortener. (*Hlekkr* is Old Norse for "link / chain".)
 
 
     **Deployment topology.** In production this service has **no public domain of its own**. It runs

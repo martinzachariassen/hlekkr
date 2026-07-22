@@ -4,3 +4,8 @@ dist/
 *.local
 *.tsbuildinfo
 .env
+
+# A macOS-style global "Icon?" ignore also matches the assets/icons dir on
+# case-insensitive filesystems — keep these brand assets tracked.
+!public/assets/icons/
+!public/assets/icons/**

@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🔗 short
+# 🔗 Hlekkr
+
+*Old Norse for "link / chain" — a direct hit for a service that makes links.*
 
 **A link shortener that doesn't track you.** Paste a URL, get a short one back —
 no accounts, no logins, clicks counted but never profiled. Built as a portfolio
@@ -8,10 +10,10 @@ project to *show the reasoning* behind persistence, concurrency, and security,
 with a [Kotlin](https://kotlinlang.org) + [Ktor](https://ktor.io) API over raw
 JDBC and a framework-free [React](https://react.dev) client.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/ci.yml)
-[![Frontend CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/frontend-ci.yml?branch=main&label=Frontend&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/frontend-ci.yml)
-[![CodeQL](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/codeql.yml?branch=main&label=CodeQL&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/martinzachariassen/url-shortener/badge)](https://scorecard.dev/viewer/?uri=github.com/martinzachariassen/url-shortener)
+[![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/ci.yml)
+[![Frontend CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/frontend-ci.yml?branch=main&label=Frontend&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/frontend-ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/codeql.yml?branch=main&label=CodeQL&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/martinzachariassen/hlekkr/badge)](https://scorecard.dev/viewer/?uri=github.com/martinzachariassen/hlekkr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Ktor](https://img.shields.io/badge/Ktor-3.5-087CFA?style=flat-square&logo=ktor&logoColor=white)](https://ktor.io)
@@ -23,14 +25,14 @@ JDBC and a framework-free [React](https://react.dev) client.
 [**Live site**](https://short.mlz.no) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
 
 <a href="https://short.mlz.no">
-  <img src="frontend/public/assets/social/og.png" alt="short — a link shortener that doesn't track you" width="640" />
+  <img src="frontend/public/assets/social/og.png" alt="Hlekkr — a link shortener that doesn't track you" width="640" />
 </a>
 
 </div>
 
 ## What it is
 
-**short** turns a long URL into a 7-character link and counts the clicks — that's
+**Hlekkr** turns a long URL into a 7-character link and counts the clicks — that's
 the whole product. The interesting part is *how* it's built. There's no Spring, no
 ORM, no auto-configuration: every plugin, query, and dependency is wired by hand so
 the reasoning behind each persistence, concurrency, and security decision stays

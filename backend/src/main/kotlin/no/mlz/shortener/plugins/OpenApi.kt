@@ -25,7 +25,7 @@ private val SWAGGER_PAGE = """
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>API reference — url-shortener</title>
+      <title>API reference — Hlekkr</title>
       <link rel="stylesheet" href="/swagger/dist/swagger-ui.css">
     </head>
     <body>

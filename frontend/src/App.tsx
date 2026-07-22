@@ -9,7 +9,7 @@ import {
 } from "./api.ts";
 import { track } from "./umami.ts";
 
-const SOURCE_URL = "https://github.com/martinzachariassen/url-shortener";
+const SOURCE_URL = "https://github.com/martinzachariassen/hlekkr";
 
 type Mode = "create" | "manage";
 
@@ -20,9 +20,12 @@ export function App() {
   return (
     <div className="page">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="short — home" data-umami-event="open-home">
+        <a className="brand" href="/" aria-label="Hlekkr — home" data-umami-event="open-home">
           <span className="brand-mark" aria-hidden="true" />
-          short
+          <span className="brand-text">
+            <span className="brand-name">Hlekkr</span>
+            <span className="brand-tag">Old Norse for “link”</span>
+          </span>
         </a>
         <nav className="nav">
           <button
