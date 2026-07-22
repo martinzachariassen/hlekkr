@@ -56,7 +56,7 @@ no user-agent, no referrer — and analytics is opt-in and cookieless.
 | Persistence   | Raw JDBC + [HikariCP](https://github.com/brettwooldridge/HikariCP) over [PostgreSQL](https://www.postgresql.org) 18 | Hand-written `PreparedStatement`s — no ORM, no N+1, auditable SQL |
 | Migrations    | [Flyway](https://flywaydb.org) 13 (`.sql`)                            | Versioned, reviewable, run under a privileged role         |
 | Runtime       | [JDK](https://adoptium.net) 25                                        | Pinned via [mise](https://mise.jdx.dev)                    |
-| Web client    | [Vite](https://vite.dev) 7 · [React](https://react.dev) 19 · TypeScript | One screen, one stylesheet, no framework or state library  |
+| Web client    | [Vite](https://vite.dev) 8 · [React](https://react.dev) 19 · TypeScript | One screen, one stylesheet, no framework or state library  |
 | Edge / proxy  | [Caddy](https://caddyserver.com)                                     | The single public entrypoint; injects the service key      |
 | Deploy        | Docker · any container platform                                       | Three services; only the proxy is public ([notes](docs/deployment.md)) |
 | Toolchain     | [mise](https://mise.jdx.dev)                                          | Pins java/node/pnpm and owns every dev task                |
