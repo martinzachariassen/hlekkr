@@ -401,6 +401,27 @@ contract, and `/swagger` — is proxied through the public `web` domain. This to
 documented in the OpenAPI `info` description so anyone reading the spec understands the API
 isn't meant to be called directly.
 
+### Troubleshooting
+
+- **`Railpack could not determine how to build the app` (only `README.md` analyzed).** The
+  service's **root directory** isn't set, so Railway only pulled the repo root. Set it to
+  `backend` / `frontend` (Settings → Source) — that's what makes Railway pick up each app's
+  `Dockerfile` and `railway.toml`.
+- **Deploy succeeds but the container won't start / `run.sh not found`.** A leftover **custom
+  start command** is overriding the Dockerfile `ENTRYPOINT`. Clear it (Settings → Deploy). If it
+  contains an unfamiliar payload, the service likely came from an untrusted template — recreate it
+  from the GitHub repo and rotate any secrets it could read (`INTERNAL_API_KEY`, DB password).
+- **`/ready` healthcheck fails with "service unavailable".** The app can't reach Postgres or
+  crashed on boot — read the **api** service's Deploy Logs. Common causes: `SERVER_HOST` not set to
+  `::` (binds IPv4, fails the IPv6 probe); missing DB vars; or `DATABASE_URL` pointing at Railway's
+  own `postgresql://…` string instead of the `jdbc:postgresql://…` form this app expects.
+- **Front-end shows "No link found" on every action.** The `X-Internal-Key` gate answers `404`, so
+  a mismatched `INTERNAL_API_KEY` looks like "not found." Ensure the value is identical on `api` and
+  `web`, and redeploy `web` (Caddy reads it at container start).
+- **Flyway NPE at startup (`PluginRegister … null`).** The shadow jar must merge Flyway's split SPI
+  registry; the build enforces this (`duplicatesStrategy = INCLUDE` plus a `verifyFlywayServiceMerge`
+  check). Don't remove either.
+
 ## Testing & CI
 
 ```bash
