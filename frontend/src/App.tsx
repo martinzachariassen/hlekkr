@@ -22,7 +22,10 @@ export function App() {
       <header className="topbar">
         <a className="brand" href="/" aria-label="Hlekkr — home" data-umami-event="open-home">
           <span className="brand-mark" aria-hidden="true" />
-          Hlekkr
+          <span className="brand-text">
+            <span className="brand-name">Hlekkr</span>
+            <span className="brand-tag">Old Norse for “link”</span>
+          </span>
         </a>
         <nav className="nav">
           <button

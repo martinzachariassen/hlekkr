@@ -6,8 +6,8 @@
   --ink-2: #4a4a45;
   --muted: #6e6c64;
   --line: #cbc9be;
-  --accent: oklch(0.74 0.13 195);
-  --accent-deep: oklch(0.52 0.1 200);
+  --accent: oklch(0.62 0.15 250);
+  --accent-deep: oklch(0.46 0.13 255);
   --danger: #8a3324;
   --warn-bg: #f2e7cd;
   --warn-ink: #7a4e15;
@@ -108,12 +108,26 @@ h1 {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   font-family: var(--sans);
+  text-decoration: none;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.1;
+}
+.brand-name {
   font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
-  text-decoration: none;
+}
+.brand-tag {
+  font-weight: 500;
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  color: var(--muted);
 }
 .brand-mark {
   width: 13px;
