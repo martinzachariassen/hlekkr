@@ -1,6 +1,6 @@
 # Deploying to Railway
 
-How the [live site](https://short.up.railway.app) is deployed. None of this is required to
+How the [live site](https://short.mlz.no) is deployed. None of this is required to
 run the project — the stack is three ordinary containers and runs anywhere (see the
 [root README](../README.md)) — these are the concrete notes for one hosting choice:
 [Railway](https://railway.app).
@@ -80,7 +80,7 @@ network by `web`. Variables:
     *(Single-role setup: point all four at `postgres` and omit the migration pair.)*
 - **`INTERNAL_API_KEY`** — a long random value (`openssl rand -base64 32`); set the *same*
   value on `web`. This is what locks the management API to your frontend.
-- **`BASE_URL`** — the **web** service's public URL (e.g. `https://short.up.railway.app`).
+- **`BASE_URL`** — the **web** service's public URL (e.g. `https://short.mlz.no`).
   Short links are built from this and resolve on the public domain; it's also the
   self-referential target check.
 - **`TRUST_PROXY_HEADERS=true`** — so per-IP rate limiting reads the real client IP from

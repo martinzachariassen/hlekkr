@@ -20,9 +20,9 @@ JDBC and a framework-free [React](https://react.dev) client.
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Deployed on Railway](https://img.shields.io/badge/Railway-deploy-0B0D0E?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
 
-[**Live site**](https://short.up.railway.app) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
+[**Live site**](https://short.mlz.no) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
 
-<a href="https://short.up.railway.app">
+<a href="https://short.mlz.no">
   <img src="frontend/public/assets/social/og.png" alt="short — a link shortener that doesn't track you" width="640" />
 </a>
 
@@ -56,7 +56,7 @@ no user-agent, no referrer — and analytics is opt-in and cookieless.
 | Persistence   | Raw JDBC + [HikariCP](https://github.com/brettwooldridge/HikariCP) over [PostgreSQL](https://www.postgresql.org) 18 | Hand-written `PreparedStatement`s — no ORM, no N+1, auditable SQL |
 | Migrations    | [Flyway](https://flywaydb.org) 13 (`.sql`)                            | Versioned, reviewable, run under a privileged role         |
 | Runtime       | [JDK](https://adoptium.net) 25                                        | Pinned via [mise](https://mise.jdx.dev)                    |
-| Web client    | [Vite](https://vite.dev) 7 · [React](https://react.dev) 19 · TypeScript | One screen, one stylesheet, no framework or state library  |
+| Web client    | [Vite](https://vite.dev) 8 · [React](https://react.dev) 19 · TypeScript | One screen, one stylesheet, no framework or state library  |
 | Edge / proxy  | [Caddy](https://caddyserver.com)                                     | The single public entrypoint; injects the service key      |
 | Deploy        | Docker · any container platform                                       | Three services; only the proxy is public ([notes](docs/deployment.md)) |
 | Toolchain     | [mise](https://mise.jdx.dev)                                          | Pins java/node/pnpm and owns every dev task                |
@@ -216,7 +216,7 @@ troubleshooting, live in [`docs/deployment.md`](docs/deployment.md).
 
 ## Testing & CI
 
-Three test layers, all run by `./gradlew build` (or `mise run test`): **unit** (JUnit 5 +
+Three test layers, all run by `./gradlew build` (or `mise run test`): **unit** (JUnit 6 +
 MockK), **repository** (Testcontainers against a real Postgres 18, including a
 `'; DROP TABLE links; --` inertness test), and **end-to-end** (Ktor test client) covering
 every endpoint and every security case from the table above. The full test inventory is in
