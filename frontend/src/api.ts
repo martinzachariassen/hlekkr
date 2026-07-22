@@ -57,37 +57,80 @@ function networkError(): Error {
   );
 }
 
-async function request(path: string, init: RequestInit): Promise<Response> {
+// Cold-start resilience: the API is allowed to idle to zero to save cost, so the first request
+// after a quiet spell can hit a still-waking service. The Caddy proxy holds and retries the dial
+// while the API boots (see frontend/Caddyfile), so that first request usually succeeds — just
+// slowly. This client retry is the fallback for what the proxy can't absorb: a gateway 5xx or a
+// dropped connection. Either way, if any attempt runs long we fire onWaking so the UI can explain
+// the wait rather than showing a silent spinner.
+const WAKE_HINT_AFTER_MS = 2500;
+const WAKE_RETRY_STATUSES = new Set([500, 502, 503, 504]);
+const WAKE_RETRY_DELAYS_MS = [1000, 2000, 4000, 6000];
+
+export interface RequestOptions {
+  onWaking?: () => void;
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function request(path: string, init: RequestInit, opts?: RequestOptions): Promise<Response> {
+  const wakeHint = opts?.onWaking ? setTimeout(opts.onWaking, WAKE_HINT_AFTER_MS) : undefined;
   try {
-    return await fetch(API_BASE + path, init);
-  } catch {
-    throw networkError();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(API_BASE + path, init);
+        if (WAKE_RETRY_STATUSES.has(res.status) && attempt < WAKE_RETRY_DELAYS_MS.length) {
+          await sleep(WAKE_RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
+        return res;
+      } catch {
+        if (attempt < WAKE_RETRY_DELAYS_MS.length) {
+          await sleep(WAKE_RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
+        throw networkError();
+      }
+    }
+  } finally {
+    if (wakeHint) clearTimeout(wakeHint);
   }
 }
 
-export async function shorten(targetUrl: string, expiresAt?: string): Promise<CreatedLink> {
-  const res = await request("/links", {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(expiresAt ? { targetUrl, expiresAt } : { targetUrl }),
-  });
+export async function shorten(
+  targetUrl: string,
+  expiresAt?: string,
+  opts?: RequestOptions,
+): Promise<CreatedLink> {
+  const res = await request(
+    "/links",
+    {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(expiresAt ? { targetUrl, expiresAt } : { targetUrl }),
+    },
+    opts,
+  );
   if (!res.ok) throw await toError(res);
   return res.json();
 }
 
-export async function fetchStats(code: string, token: string): Promise<Stats> {
-  const res = await request(`/links/${encodeURIComponent(code)}/stats`, {
-    headers: headers({ Authorization: `Bearer ${token}` }),
-  });
+export async function fetchStats(code: string, token: string, opts?: RequestOptions): Promise<Stats> {
+  const res = await request(
+    `/links/${encodeURIComponent(code)}/stats`,
+    { headers: headers({ Authorization: `Bearer ${token}` }) },
+    opts,
+  );
   if (!res.ok) throw await toError(res);
   return res.json();
 }
 
-export async function deleteLink(code: string, token: string): Promise<void> {
-  const res = await request(`/links/${encodeURIComponent(code)}`, {
-    method: "DELETE",
-    headers: headers({ Authorization: `Bearer ${token}` }),
-  });
+export async function deleteLink(code: string, token: string, opts?: RequestOptions): Promise<void> {
+  const res = await request(
+    `/links/${encodeURIComponent(code)}`,
+    { method: "DELETE", headers: headers({ Authorization: `Bearer ${token}` }) },
+    opts,
+  );
   if (!res.ok) throw await toError(res);
 }
 
