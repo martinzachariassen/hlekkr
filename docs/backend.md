@@ -1,9 +1,9 @@
 # Backend — the API
 
 Kotlin 2.4 + [Ktor](https://ktor.io) (Netty) on JDK 25, raw JDBC over PostgreSQL 18, Flyway
-migrations. The architecture and the reasoning behind every security decision live in the
-[root README](../README.md) — this page covers running the app, configuring it, and the
-contract it exposes to the [frontend](frontend.md).
+migrations. The architecture overview lives in the [root README](../README.md) and the
+security reasoning in [`security.md`](security.md) — this page covers running the app,
+configuring it, and the contract it exposes to the [frontend](frontend.md).
 
 ## Running
 
@@ -86,6 +86,27 @@ What the API **requires** of its caller:
 - `BASE_URL` must be the public domain that routes `/{code}` back to this API (the web
   proxy's domain), or the short links it returns won't resolve.
 
+### Examples
+
+```bash
+# Create (locally, with no INTERNAL_API_KEY set)
+curl -s -X POST localhost:8080/links \
+  -H 'Content-Type: application/json' \
+  -d '{"targetUrl":"https://example.com"}'
+# → {"code":"d10ndrX","shortUrl":"http://localhost:8080/d10ndrX","ownerToken":"g3UQ…"}
+
+# Redirect
+curl -i localhost:8080/d10ndrX          # 302 Location: https://example.com
+
+# Stats / delete (owner token required)
+curl localhost:8080/links/d10ndrX/stats -H "Authorization: Bearer g3UQ…"
+curl -X DELETE localhost:8080/links/d10ndrX -H "Authorization: Bearer g3UQ…"
+
+# Once INTERNAL_API_KEY is set, management calls also need the service header:
+curl -X POST localhost:8080/links -H 'X-Internal-Key: <key>' \
+  -H 'Content-Type: application/json' -d '{"targetUrl":"https://example.com"}'
+```
+
 ## The redirect hot path
 
 `GET /{code}` never waits on a click write — the id goes onto a bounded channel and a
@@ -105,3 +126,29 @@ sequenceDiagram
     K-->>V: 302 Location: target
     T->>P: batched insert of clicks (background)
 ```
+
+## Testing
+
+```bash
+cd backend
+./gradlew build test
+```
+
+- **Unit** (JUnit 5 + MockK): `UrlValidator`, `LinkService`, `CodeGenerator`, rate limiter,
+  owner-token hashing, and the service-key constant-time compare.
+- **Repository** (Testcontainers, real Postgres 18): parameterized queries, uniqueness,
+  soft-delete/expiry filtering, click aggregation, and a `'; DROP TABLE links; --`
+  inertness test.
+- **End-to-end** (Ktor test client + Testcontainers): every endpoint plus the explicit
+  security cases — dangerous schemes, private/metadata targets, oversized body → `413`,
+  malformed JSON → clean `400`, missing/wrong owner token → `404`, missing/wrong service key
+  → `404` (with the redirect still public), rate limit → `429 + Retry-After` (create *and*
+  stats), the security headers, CORS scheme-pinning, the DB-backed readiness probe, the
+  self-hosted (CDN-free) Swagger UI, and that `/health` and `/openapi.yaml` stay public.
+
+Static analysis is enforced at the compiler: `allWarningsAsErrors = true` fails the build
+on any Kotlin warning. A dedicated SAST scanner for Kotlin (CodeQL / detekt) is
+intentionally *not* wired in yet — as of this writing neither supports the bleeding-edge
+**JDK 25 + Kotlin 2.4** toolchain this project pins (CodeQL's Kotlin extractor sees "no
+source"; detekt's bundled compiler rejects JVM target 25). It should be added once the
+tooling catches up, or by pinning an older toolchain.

@@ -20,7 +20,7 @@ JDBC and a framework-free [React](https://react.dev) client.
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Deployed on Railway](https://img.shields.io/badge/Railway-deploy-0B0D0E?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
 
-[**Live site**](https://short.up.railway.app) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment)
+[**Live site**](https://short.up.railway.app) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
 
 <a href="https://short.up.railway.app">
   <img src="frontend/public/assets/social/og.png" alt="short — a link shortener that doesn't track you" width="640" />
@@ -156,7 +156,7 @@ url-shortener/
 ├── frontend/                    # single-screen web client (Vite + React + TS)
 │   ├── src/                     # components + one stylesheet
 │   └── Caddyfile                # the single public entrypoint (prod)
-├── docs/                        # per-app guides (backend, frontend) + deployment notes
+├── docs/                        # the depth: security spec, per-app guides, deployment notes
 ├── mise.toml                    # pinned toolchain + one-command dev stack
 ├── docker-compose.yml           # Postgres + Flyway + API
 └── .github/                     # CI: build/test, CodeQL, Trivy, Scorecard, blocklist refresh
@@ -179,27 +179,10 @@ reviewable, in keeping with the rest of the project.
 | `GET`    | `/health`             | **public**                      | Liveness probe → `200 OK` (no dependency checks).                        |
 | `GET`    | `/ready`              | **public**                      | Readiness probe → `200 READY`, or `503` if Postgres is unreachable. Used as the deploy health check. |
 
-"frontend key" = the `X-Internal-Key` header described in [Restricting the API to your
-frontend](#restricting-the-api-to-your-frontend). It is unset (open) in local development.
-
-```bash
-# Create (locally, with no INTERNAL_API_KEY set)
-curl -s -X POST localhost:8080/links \
-  -H 'Content-Type: application/json' \
-  -d '{"targetUrl":"https://example.com"}'
-# → {"code":"d10ndrX","shortUrl":"http://localhost:8080/d10ndrX","ownerToken":"g3UQ…"}
-
-# Redirect
-curl -i localhost:8080/d10ndrX          # 302 Location: https://example.com
-
-# Stats / delete (owner token required)
-curl localhost:8080/links/d10ndrX/stats -H "Authorization: Bearer g3UQ…"
-curl -X DELETE localhost:8080/links/d10ndrX -H "Authorization: Bearer g3UQ…"
-
-# Once INTERNAL_API_KEY is set, management calls also need the service header:
-curl -X POST localhost:8080/links -H 'X-Internal-Key: <key>' \
-  -H 'Content-Type: application/json' -d '{"targetUrl":"https://example.com"}'
-```
+"frontend key" = the `X-Internal-Key` header explained in
+[`docs/security.md`](docs/security.md#restricting-the-api-to-your-frontend). It is unset
+(open) in local development. `curl` examples and the full request/response contract are in
+[`docs/backend.md`](docs/backend.md).
 
 ## Security decisions
 
@@ -219,160 +202,34 @@ code and to an explicit test. The short version:
 | Runaway or hostile queries | DML-only DB role, statement timeout, bounded connection pool |
 | Oversized payloads | Bodies streamed with a hard 16 KB cap → `413` |
 
-The reasoning behind each:
-
-- **Input validation is SSRF-preventive, on purpose.** `UrlValidator` allows only
-  `http`/`https`, and rejects loopback/link-local/private ranges (`127/8`, `10/8`,
-  `172.16/12`, `192.168/16`, `169.254/16` incl. the `169.254.169.254` cloud-metadata
-  endpoint, `::1`, `fc00::/7`), `localhost`, embedded credentials, and URLs pointing back
-  at this service's own domain. This service does **not** fetch the target today, so none
-  of this is load-bearing yet — it exists so that adding a preview/screenshot feature
-  later cannot silently open an SSRF hole. DNS is deliberately *not* resolved at creation
-  time: it would add nondeterminism and its own lookup surface and would be stale by fetch
-  time, so any future fetch must re-validate the resolved address then.
-- **Content policy via a domain blocklist.** Separately from the SSRF checks,
-  `UrlValidator` consults a `HostBlocklist` and refuses to shorten targets on it (adult,
-  malware, phishing). Matching is by domain *suffix* — one entry covers a domain and all its
-  subdomains — and each in-memory check walks the host's label suffixes, so even a
-  100k-domain feed costs nothing per request. The production image **bakes two free,
-  maintained lists at build time** — [HaGeZi NSFW](https://github.com/hagezi/dns-blocklists)
-  (adult, ~115k domains) and [URLhaus](https://urlhaus.abuse.ch/) (fresh malware) — so there
-  is **no runtime dependency**; a weekly
-  [`refresh-blocklist`](.github/workflows/refresh-blocklist.yml) workflow re-fetches both
-  feeds (failing loudly if either 404s or shrinks suspiciously — a canary for upstream URL
-  rot), bumps a cache-bust marker, and lets Railway's auto-deploy rebuild with current lists.
-  Local Compose builds skip the fetch (`FETCH_BLOCKLISTS=false`) and run with an empty,
-  no-op list. Operators can override with `BLOCKED_HOSTS` (inline) or `BLOCKED_HOSTS_FILE`
-  (one domain per line, or `hosts`-file format). Live URL-level verdicts (e.g. Google Safe
-  Browsing) are deliberately not wired in: a synchronous third-party call gating every write
-  isn't worth it here, and it wouldn't cover adult content anyway.
-- **Short codes are random, not sequential.** A base62-of-autoincrement scheme is
-  enumerable — walk `/1`, `/2`, `/3` and scrape every link ever made. Codes are 7 random
-  base62 characters from `SecureRandom` with a DB uniqueness check and a bounded retry that
-  **fails closed**. (Sqids was considered and rejected: it is reversible given the salt.)
-- **Owner tokens, hashed at rest.** No user accounts. Creation returns a 256-bit
-  `SecureRandom` token once; only its SHA-256 hash is stored. Stats/delete compare against
-  the hash in constant time and return **`404`, not `403`**, on mismatch — so the API can't
-  be used to probe which codes exist.
-- **Undifferentiated 404s.** Missing, expired, deleted, and auth-failed all return the same
-  generic `404` on the public surface. Detail is reserved for authenticated calls.
-- **Rate limiting.** In-memory per-IP token bucket: strict on `POST /links` (the
-  spam/phishing surface), looser on `GET /{code}`. Exceeding it returns `429` with
-  `Retry-After`. This is single-instance state and does **not** survive horizontal scaling
-  — Redis is the swap-in for that (see out-of-scope).
-- **No raw errors leak.** A global `StatusPages` handler maps known failures to clean 4xx
-  and everything else to a generic `500`. Exception messages, stack traces, and SQL text
-  are logged server-side with a correlation id that is also returned to the client
-  (`X-Correlation-Id` and in the error body) for support — never the underlying detail.
-- **Frontend-only management surface.** `POST /links`, stats, and delete require an
-  `X-Internal-Key` header matching a per-deployment secret that only the frontend holds; a
-  constant-time compare gates it and a miss returns the same generic `404`. The redirect
-  stays public. See [Restricting the API to your frontend](#restricting-the-api-to-your-frontend)
-  for why this — not CORS — is the real gate.
-- **Hardening headers on every response.** HSTS, `X-Content-Type-Options: nosniff`,
-  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy:
-  default-src 'none'` (this is a JSON API that serves no HTML — the Swagger UI docs get a
-  narrowly-relaxed same-origin CSP so the page can load its own assets). CORS is an explicit
-  allow-list, never `*`, and credentials are not enabled.
-- **Least-privilege database role.** Migrations run under a privileged admin role (the
-  `flyway` step in Compose, or a deploy job); the application connects under a role with
-  **DML only** — no DDL, not a superuser. `ALTER DEFAULT PRIVILEGES` grants the app DML on
-  the tables the admin creates. A statement timeout and a bounded Hikari pool cap the blast
-  radius of a runaway query.
-- **Bounded request bodies.** `POST /links` bodies are capped (16 KB) and streamed with a
-  hard limit → `413`, so an oversized payload can't hang or OOM the server.
-- **Secrets only from the environment.** DB credentials come from env vars; the app **fails
-  fast at startup** if a required one is missing or blank. `.env` is git-ignored; only
-  `.env.example` is committed. The connection string is never logged.
-
-### Restricting the API to your frontend
-
-The goal: only the project's own frontend can create, inspect, or delete links — not
-anyone with `curl`. The redirect endpoint `GET /{code}` is the exception; it *is* the
-short link, so it must stay public.
-
-**CORS is not enough.** CORS is a browser-enforced policy: it stops a malicious *web page*
-from reading your API cross-origin, but `curl`, Postman, and any server ignore it
-entirely. Relying on CORS alone would leave `POST /links` open to the world. So the real
-gate is a **shared service key**: the management routes require an `X-Internal-Key` header
-whose value only the frontend knows, checked in constant time, with a miss returning the
-same generic `404` as everything else.
-
-The key belongs to the frontend's **server**, never the browser. Here that server is the
-[Caddy](https://caddyserver.com) proxy in front of the web app (`frontend/Caddyfile`),
-which is the **only service with a public domain**. The API sits on the private network
-with no public ingress of its own, so every public request goes through Caddy: it injects
-`X-Internal-Key` on `/api/*` and passes the genuinely public routes (redirect, spec,
-Swagger) straight through. The secret never ships to the client, and because the calls are
-same-origin, no CORS is involved at all.
-
-```mermaid
-flowchart LR
-    subgraph Caddy["Caddy — public, holds INTERNAL_API_KEY"]
-        Inject["inject X-Internal-Key"]
-        Pass["pass through"]
-    end
-
-    subgraph Api["Shortener API — private, no public ingress"]
-        Mgmt["POST /links · stats · delete<br/>(key required)"]
-        Public["GET /{code} · docs<br/>(public)"]
-    end
-
-    Browser["Browser (SPA)"] -->|"/api/*"| Inject
-    Visitor["Link visitor"] -->|"/{code}"| Pass
-    Anyone["Anyone"] -->|"/openapi.yaml · /swagger"| Pass
-    Inject --> Mgmt
-    Pass --> Public
-```
-
-This composes with the existing per-link owner token to give two independent layers: the
-service key answers *"is this the frontend?"* and the owner token answers *"does this
-caller own this link?"*. Locally, leaving `INTERNAL_API_KEY` unset disables the gate (the
-app logs a warning at startup) so development stays friction-free.
+The full reasoning behind each decision — and why the service key, not CORS, is the real
+gate — is in [`docs/security.md`](docs/security.md).
 
 ## Deployment
 
 The stack is three ordinary containers — **web** (Caddy, the only public entrypoint),
 **api**, and **Postgres** — each built from its own `Dockerfile`, so it runs on any
-container platform. The one topology rule worth keeping is the one above: only the proxy
-is public, and the proxy holds the key. The notes for my own deployment (Railway),
-including the full variable list and troubleshooting, live in
-[`docs/deployment.md`](docs/deployment.md).
+container platform. The one topology rule worth keeping: only the proxy is public, and the
+proxy holds the key ([why](docs/security.md#restricting-the-api-to-your-frontend)). The
+notes for my own deployment (Railway), including the full variable list and
+troubleshooting, live in [`docs/deployment.md`](docs/deployment.md).
 
 ## Testing & CI
 
-```bash
-cd backend
-./gradlew build test
-```
+Three test layers, all run by `./gradlew build` (or `mise run test`): **unit** (JUnit 5 +
+MockK), **repository** (Testcontainers against a real Postgres 18, including a
+`'; DROP TABLE links; --` inertness test), and **end-to-end** (Ktor test client) covering
+every endpoint and every security case from the table above. The full test inventory is in
+[`docs/backend.md`](docs/backend.md#testing).
 
-- **Unit** (JUnit 5 + MockK): `UrlValidator`, `LinkService`, `CodeGenerator`, rate limiter,
-  owner-token hashing, and the service-key constant-time compare.
-- **Repository** (Testcontainers, real Postgres 18): parameterized queries, uniqueness,
-  soft-delete/expiry filtering, click aggregation, and a `'; DROP TABLE links; --`
-  inertness test.
-- **End-to-end** (Ktor test client + Testcontainers): every endpoint plus the explicit
-  security cases — dangerous schemes, private/metadata targets, oversized body → `413`,
-  malformed JSON → clean `400`, missing/wrong owner token → `404`, missing/wrong service key
-  → `404` (with the redirect still public), rate limit → `429 + Retry-After` (create *and*
-  stats), the security headers, CORS scheme-pinning, the DB-backed readiness probe, the
-  self-hosted (CDN-free) Swagger UI, and that `/health` and `/openapi.yaml` stay public.
-
-CI (GitHub Actions) runs `./gradlew build` (compile + full test suite), a
-[Trivy](https://trivy.dev) dependency scan that fails on any HIGH/CRITICAL CVE,
-`dependency-review` on PRs, [OpenSSF Scorecard](https://scorecard.dev), and a
-Conventional-Commit PR-title check. Dependabot keeps Gradle, npm, Actions, and Docker
-dependencies current, and `main` is protected by a ruleset requiring the `build` check and
-a PR.
-
-Static analysis runs on two fronts. The frontend is scanned by **CodeQL**
-(JavaScript/TypeScript), with findings uploaded to the Security tab. On the backend it's
-enforced at the compiler: `allWarningsAsErrors = true` fails the build on any Kotlin
-warning. A dedicated SAST scanner for Kotlin (CodeQL / detekt) is intentionally *not* wired
-in yet — as of this writing neither supports the bleeding-edge **JDK 25 + Kotlin 2.4**
-toolchain this project pins (CodeQL's Kotlin extractor sees "no source"; detekt's bundled
-compiler rejects JVM target 25). It should be added once the tooling catches up, or by
-pinning an older toolchain.
+CI (GitHub Actions) runs the build + full suite, a [Trivy](https://trivy.dev) scan that
+fails on any HIGH/CRITICAL CVE, `dependency-review` on PRs,
+[OpenSSF Scorecard](https://scorecard.dev), CodeQL on the frontend, and a
+Conventional-Commit PR-title check; Dependabot keeps dependencies current and `main` is
+protected by a ruleset requiring the `build` check and a PR. On the backend, static
+analysis is enforced at the compiler (`allWarningsAsErrors`); a dedicated Kotlin SAST
+scanner is deliberately absent until one supports the pinned JDK 25 + Kotlin 2.4 toolchain
+(details in [`docs/backend.md`](docs/backend.md#testing)).
 
 ## Out of scope (and why)
 
