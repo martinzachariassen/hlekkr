@@ -11,7 +11,9 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 # Readiness (DB-backed), not liveness, so a deploy only goes live once it can reach Postgres.
+# The window covers a cold JVM start plus Flyway migrations against a possibly-waking DB; 30s was too
+# tight on a fresh instance, so give first boot room rather than fail a healthy-but-slow deploy.
 healthcheckPath = "/ready"
-healthcheckTimeout = 30
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
