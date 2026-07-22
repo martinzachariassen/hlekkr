@@ -27,12 +27,11 @@
 	}
 }
 
-# Shared upstream options for every route proxied to the private API. Two jobs:
+# Shared upstream options for every proxied route. Two jobs:
 #   - Pin X-Forwarded-For to the real client IP so the API's per-IP rate limiter buckets each
-#     visitor separately, not the whole world under one proxy address. The API must run with
-#     TRUST_PROXY_HEADERS=true (and SERVER_HOST=::) to read it — see backend/.env.example.
-#   - Ride out cold starts: Railway may idle the API to zero, so hold and retry the dial for a
-#     window rather than 502 the instant it's still booting.
+#     visitor separately (the API reads it with TRUST_PROXY_HEADERS=true).
+#   - Ride out cold starts: Railway may idle the API to zero, so hold and retry the dial rather
+#     than 502 the instant it's still booting.
 (api_transport) {
 	header_up X-Forwarded-For {http.request.client_ip}
 	lb_try_duration 20s
@@ -55,9 +54,7 @@
 		}
 	}
 
-	# Public API surface, proxied straight through (no key): the OpenAPI contract and Swagger UI.
-	# The API sets its own CSP on these responses. One `path` matcher ORs the paths; the redirect
-	# needs its own regex matcher, so it gets a separate handle block.
+	# Public API surface, proxied straight through (no key). The API sets its own CSP here.
 	@docs path /openapi.yaml /swagger /swagger/*
 	handle @docs {
 		reverse_proxy {$API_UPSTREAM} {

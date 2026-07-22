@@ -16,8 +16,8 @@ import io.ktor.server.response.respond
 import kotlinx.serialization.SerializationException
 import org.slf4j.LoggerFactory
 
-// The only place exceptions become responses: clients get a clean status, a safe message, and a
-// correlation id; raw messages, stack traces, and SQL text stay in the server logs.
+// The only place exceptions become responses: clients get a safe message and a correlation id;
+// raw messages, stack traces, and SQL text stay in the server logs.
 fun Application.configureStatusPages() {
     val log = LoggerFactory.getLogger("StatusPages")
 

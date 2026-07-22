@@ -24,7 +24,6 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 
-// Mapped to 413 in StatusPages.
 class PayloadTooLargeException : RuntimeException()
 
 private const val INTERNAL_KEY_HEADER = "X-Internal-Key"
@@ -35,16 +34,15 @@ fun Application.linkRoutes(components: AppComponents) {
     val service = components.linkService
 
     routing {
-        // Liveness: the process is up and serving. Cheap and dependency-free so a DB blip never
-        // triggers a restart. Readiness (can it serve traffic?) is a separate DB-backed probe.
+        // Liveness stays dependency-free so a DB blip never triggers a restart; /ready is the
+        // DB-backed readiness probe.
         get("/health") { call.respondText("OK") }
 
         get("/ready") {
             val correlationId = call.callId ?: "unknown"
             val ready = withContext(Dispatchers.IO) {
                 runCatching { components.checkReadiness() }.getOrElse {
-                    // A red probe with no log reason is an operational blind spot; message only, no
-                    // stack trace, so a sustained outage doesn't flood the log every poll.
+                    // Message only, no stack trace — a sustained outage would flood the log every poll.
                     log.warn("Readiness check failed: {} [{}]", it.message ?: it.javaClass.simpleName, correlationId)
                     false
                 }
@@ -56,8 +54,6 @@ fun Application.linkRoutes(components: AppComponents) {
             }
         }
 
-        // Management surface — gated on the internal key (see fromFrontend). All three touch the
-        // DB, so they carry the limiter too and run their blocking work off the request dispatcher.
         post("/links") {
             if (!fromFrontend(components) || !allow(components, isCreate = true)) return@post
             val request = receiveCreateRequest(components.maxBodyBytes)
@@ -91,7 +87,7 @@ fun Application.linkRoutes(components: AppComponents) {
             call.respond(HttpStatusCode.NoContent)
         }
 
-        // Public: the short link itself. Must stay reachable by anyone clicking it.
+        // The short link itself — the one route that must stay public.
         get("/{code}") {
             if (!allow(components, isCreate = false)) return@get
             val code = call.parameters["code"].orEmpty()
@@ -101,8 +97,8 @@ fun Application.linkRoutes(components: AppComponents) {
     }
 }
 
-// A missing/wrong internal key gets a generic 404, never revealing the route exists. Open when no
-// key is configured (local dev).
+// A missing/wrong internal key gets a generic 404 — never a 403 that would reveal the route
+// exists. Open when no key is configured (local dev).
 private suspend fun RoutingContext.fromFrontend(components: AppComponents): Boolean {
     val expected = components.internalApiKey ?: return true
     if (ServiceKey.matches(call.request.headers[INTERNAL_KEY_HEADER], expected)) return true

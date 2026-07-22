@@ -11,8 +11,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-# Vite inlines import.meta.env.* at build time, so these must be present when `pnpm build` runs.
-# VITE_API_BASE=/api routes all API calls (management, docs, redirects) through the same-origin
+# Vite inlines import.meta.env.* at build time. /api routes every call through the same-origin
 # Caddy proxy, so the private backend needs no public domain of its own.
 ARG VITE_API_BASE=/api
 ARG VITE_UMAMI_SRC

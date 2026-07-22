@@ -78,7 +78,7 @@ directly at [`/swagger`](http://localhost:8080/swagger).
 `mise tasks` lists the rest:
 
 ```bash
-mise run backend   # just the API against local Postgres
+mise run backend    # just the API against local Postgres
 mise run web        # just the web app (expects the API running)
 mise run test       # backend suite: unit + Testcontainers + e2e (needs Docker)
 mise run lint       # compile gate: allWarningsAsErrors
@@ -103,24 +103,22 @@ Redirects are the hot path and stay fast: the click write is pushed onto a corou
 on a click insert.
 
 ```
-                      ┌──────────────────────────────────────────────┐
-   POST /links        │  Ktor (Netty)                                 │
-   GET  /{code}       │                                               │
-   GET  /links/../    │   SecurityHeaders ─ CallId ─ CORS ─ StatusPages│
-   DELETE /links/..   │        │                                      │
-  ───────────────────▶│   Rate limiter (token bucket, per-IP)         │
-                      │        │                                      │
-                      │   LinkRoutes ──▶ LinkService ──▶ LinkRepository│──┐
-                      │                     │            (PreparedStmt)│  │  Hikari
-                      │                     ▼                          │  │  pool
-                      │              UrlValidator                      │  │  (DML-only role)
-                      │              CodeGenerator                     │  ▼
-                      │              OwnerToken                        │ ┌───────────────┐
-                      │                     │                          │ │  PostgreSQL   │
-                      │              ClickTracker ─ Channel ─ batch ───▶│ │  links, clicks│
-                      └──────────────────────────────────────────────┘ └───────────────┘
-                                                                          ▲
-                                       Flyway migrations (admin role) ────┘
+                      ┌────────────────────────────────────────────────┐
+   POST /links        │  Ktor (Netty)                                  │
+   GET  /{code}       │                                                │
+   GET  /links/…      │  SecurityHeaders · CallId · CORS · StatusPages │
+   DELETE /links/…    │                    │                           │
+  ───────────────────▶│  Rate limiter (token bucket, per client IP)    │
+                      │                    │                           │
+                      │  LinkRoutes ─▶ LinkService ─▶ LinkRepository ──┼──▶ HikariCP pool
+                      │                   │                            │    (DML-only role)
+                      │     UrlValidator · CodeGenerator · OwnerToken  │         │
+                      │                   │                            │         ▼
+                      │                   │                            │  ┌───────────────┐
+                      │  ClickTracker ─ Channel ─ batched inserts ─────┼─▶│  PostgreSQL   │
+                      └────────────────────────────────────────────────┘  │ links · clicks│
+                                                                          └───────▲───────┘
+                                                Flyway migrations (admin role) ───┘
 ```
 
 ### Why Ktor + raw JDBC over Spring/ORM
@@ -200,7 +198,22 @@ curl -X POST localhost:8080/links -H 'X-Internal-Key: <key>' \
 ## Security decisions
 
 Written as decisions with reasoning, because that's what a reviewer reads. Each maps to
-code and to an explicit test.
+code and to an explicit test. The short version:
+
+| Threat | Defense |
+| ------ | ------- |
+| SSRF / internal-network targets | `UrlValidator`: scheme allow-list; rejects loopback, private, link-local & cloud-metadata ranges — including alternate IPv4 encodings — plus embedded credentials and self-referential URLs |
+| Link enumeration / scraping | 7-char random base62 codes from `SecureRandom`, never sequential; fail-closed retry on collision |
+| Probing which codes exist | Missing, expired, deleted, and auth-failed all return the same generic `404` — never `403` |
+| Owner-token theft from the DB | Tokens returned once, stored only as SHA-256, compared in constant time |
+| Spam / abuse | Per-IP token-bucket rate limiting, strict on `POST /links` → `429` + `Retry-After` |
+| Malware / phishing / adult targets | Suffix-matched domain blocklist, baked into the image at build time and refreshed weekly |
+| Anyone-with-`curl` API use | `X-Internal-Key` service gate held by the Caddy proxy, never the browser |
+| Detail leaks in errors | `StatusPages` maps everything to clean responses; correlation id only |
+| Runaway or hostile queries | DML-only DB role, statement timeout, bounded connection pool |
+| Oversized payloads | Bodies streamed with a hard 16 KB cap → `413` |
+
+The reasoning behind each:
 
 - **Input validation is SSRF-preventive, on purpose.** `UrlValidator` allows only
   `http`/`https`, and rejects loopback/link-local/private ranges (`127/8`, `10/8`,
@@ -213,26 +226,20 @@ code and to an explicit test.
   time, so any future fetch must re-validate the resolved address then.
 - **Content policy via a domain blocklist.** Separately from the SSRF checks,
   `UrlValidator` consults a `HostBlocklist` and refuses to shorten targets on it (adult,
-  malware, phishing). Matching is by domain *suffix*, so one entry covers a domain and all
-  its subdomains; the set is in memory and each check walks the host's label suffixes, so
-  even a 100k-domain feed costs nothing per request. The production image **bakes two free,
-  maintained lists at build time** — the [HaGeZi NSFW](https://github.com/hagezi/dns-blocklists)
-  list (adult, ~115k registrable domains) and [URLhaus](https://urlhaus.abuse.ch/) (fresh
-  malware) — so every redeploy refreshes them and there is **no runtime dependency**. To
-  keep the baked lists current, a weekly
+  malware, phishing). Matching is by domain *suffix* — one entry covers a domain and all its
+  subdomains — and each in-memory check walks the host's label suffixes, so even a
+  100k-domain feed costs nothing per request. The production image **bakes two free,
+  maintained lists at build time** — [HaGeZi NSFW](https://github.com/hagezi/dns-blocklists)
+  (adult, ~115k domains) and [URLhaus](https://urlhaus.abuse.ch/) (fresh malware) — so there
+  is **no runtime dependency**; a weekly
   [`refresh-blocklist`](.github/workflows/refresh-blocklist.yml) workflow re-fetches both
-  feeds (and fails loudly if either 404s or returns suspiciously few domains — a canary for
-  upstream URL rot), then bumps a `.blocklist-epoch` marker that busts the Dockerfile's
-  fetch-layer cache; the push triggers Railway's auto-deploy, which rebuilds with
-  freshly-downloaded lists. Load is deterministic and in-memory (~25 MB heap); the app logs
-  the domain count at startup. The list is empty (a no-op) for local Compose builds, which
-  pass `FETCH_BLOCKLISTS=false` to stay fast and offline. Operators can override with
-  `BLOCKED_HOSTS` (inline) or point `BLOCKED_HOSTS_FILE` at their own list (plain
-  one-domain-per-line *or* `hosts`-file format — e.g. a
-  [UT1 Capitole](https://dsi.ut-capitole.fr/blacklists/) category). This covers *known* bad
-  domains; live URL-level malware/phishing verdicts (e.g. Google Safe Browsing) would be a
-  create-time add-on, deliberately not wired in — a synchronous third-party call gating
-  writes isn't worth it here, and it wouldn't cover adult content anyway.
+  feeds (failing loudly if either 404s or shrinks suspiciously — a canary for upstream URL
+  rot), bumps a cache-bust marker, and lets Railway's auto-deploy rebuild with current lists.
+  Local Compose builds skip the fetch (`FETCH_BLOCKLISTS=false`) and run with an empty,
+  no-op list. Operators can override with `BLOCKED_HOSTS` (inline) or `BLOCKED_HOSTS_FILE`
+  (one domain per line, or `hosts`-file format). Live URL-level verdicts (e.g. Google Safe
+  Browsing) are deliberately not wired in: a synchronous third-party call gating every write
+  isn't worth it here, and it wouldn't cover adult content anyway.
 - **Short codes are random, not sequential.** A base62-of-autoincrement scheme is
   enumerable — walk `/1`, `/2`, `/3` and scrape every link ever made. Codes are 7 random
   base62 characters from `SecureRandom` with a DB uniqueness check and a bounded retry that

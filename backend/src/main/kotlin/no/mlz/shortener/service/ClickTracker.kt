@@ -12,8 +12,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 
 // Keeps click writes off the redirect hot path: record() drops the id on a bounded channel and a
-// single background coroutine batches inserts. Overflow drops oldest rather than blocking redirects,
-// and a crash loses at most one un-flushed batch — acceptable for analytics counts, not billing.
+// background coroutine batches the inserts. Overflow drops oldest rather than blocking redirects;
+// a crash loses at most one un-flushed batch — acceptable for analytics, not billing.
 class ClickTracker(
     private val repository: LinkRepository,
     private val scope: CoroutineScope,
@@ -41,9 +41,9 @@ class ClickTracker(
     private suspend fun consume() {
         val buffer = ArrayList<Long>(batchSize)
         while (true) {
+            // receiveCatching lets the channel close mid-fill (on shutdown) without throwing.
             val first = channel.receiveCatching().getOrNull() ?: break
             buffer.add(first)
-            // receiveCatching lets the channel close mid-fill (on shutdown) without throwing.
             withTimeoutOrNull(flushIntervalMs) {
                 while (buffer.size < batchSize) {
                     val next = channel.receiveCatching().getOrNull() ?: return@withTimeoutOrNull

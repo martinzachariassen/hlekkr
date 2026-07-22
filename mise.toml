@@ -1,15 +1,11 @@
-# One toolchain, one command. `mise install` pins the tools below; `mise run dev` brings the whole
-# stack up. See the root README for the full picture.
-
 [tools]
 java = "temurin-25"
 node = "lts"
 # Pinned (not "latest") so local and CI resolve identical deps; matches package.json packageManager.
 pnpm = "10.11.0"
 
-# Derive the API's DB creds from the SAME source docker-compose uses (the git-ignored .env, if
-# present), falling back to the dev defaults baked into docker-compose.yml. One source of truth means
-# the app and the Postgres role can never drift apart.
+# DB creds come from the SAME source docker-compose uses (.env, else its dev defaults), so the app
+# and the Postgres role can never drift apart.
 [tasks._api]
 hide = true
 run = """
@@ -20,9 +16,8 @@ run = """
 : "${DB_ADMIN_USER:=shortener_admin}"
 : "${DB_ADMIN_PASSWORD:=dev_admin_pw}"
 docker compose up -d --wait db
-# --no-daemon keeps the app JVM inside this task's process group, so the dev task's `kill 0` reaps it
-# on Ctrl-C. A daemon-forked JVM lives in the daemon's own group, survives, and squats on :8080 —
-# which then breaks the next `mise run dev` with "Address already in use".
+# --no-daemon keeps the app JVM in this task's process group so `kill 0` reaps it on Ctrl-C;
+# a daemon-forked JVM would survive and squat on :8080.
 cd backend && \
   DATABASE_URL="jdbc:postgresql://localhost:5432/${POSTGRES_DB}" \
   DATABASE_USER="$APP_DB_USER" DATABASE_PASSWORD="$APP_DB_PASSWORD" \

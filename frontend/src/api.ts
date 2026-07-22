@@ -1,5 +1,5 @@
-// Prod points at "/api", same-origin through the Caddy proxy, which injects the internal key
-// server-side — the key never reaches the browser. See README §Deployment.
+// Prod points at "/api": same-origin through the Caddy proxy, which injects the internal key
+// server-side, so the key never reaches the browser.
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/+$/, "");
 
 export interface CreatedLink {
@@ -22,7 +22,6 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   return { "Content-Type": "application/json", ...extra };
 }
 
-// Map status codes to messages a person can act on; the API itself never leaks internals.
 async function toError(res: Response): Promise<Error> {
   let body: { error?: string; correlationId?: string } | null = null;
   try {
@@ -57,12 +56,9 @@ function networkError(): Error {
   );
 }
 
-// Cold-start resilience: the API is allowed to idle to zero to save cost, so the first request
-// after a quiet spell can hit a still-waking service. The Caddy proxy holds and retries the dial
-// while the API boots (see frontend/Caddyfile), so that first request usually succeeds — just
-// slowly. This client retry is the fallback for what the proxy can't absorb: a gateway 5xx or a
-// dropped connection. Either way, if any attempt runs long we fire onWaking so the UI can explain
-// the wait rather than showing a silent spinner.
+// Cold-start resilience: the API may idle to zero, and the Caddy proxy holds the dial while it
+// boots (see Caddyfile). This retry covers what the proxy can't absorb — a gateway 5xx or dropped
+// connection — and onWaking lets the UI explain the wait instead of showing a silent spinner.
 const WAKE_HINT_AFTER_MS = 2500;
 const WAKE_RETRY_STATUSES = new Set([500, 502, 503, 504]);
 const WAKE_RETRY_DELAYS_MS = [1000, 2000, 4000, 6000];
@@ -134,5 +130,4 @@ export async function deleteLink(code: string, token: string, opts?: RequestOpti
   if (!res.ok) throw await toError(res);
 }
 
-// Same-origin in prod (Caddy proxies /swagger); point at the API's own origin in local dev.
 export const apiDocsUrl = /^https?:\/\//.test(API_BASE) ? `${API_BASE}/swagger` : "/swagger";

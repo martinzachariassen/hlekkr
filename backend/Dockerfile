@@ -12,18 +12,16 @@ RUN ./gradlew --no-daemon dependencies >/dev/null 2>&1 || true
 COPY src ./src
 RUN ./gradlew --no-daemon shadowJar
 
-# ---- Blocklist stage: fetch content-policy domain lists, baked into the image ----
-# HaGeZi NSFW (adult) + URLhaus (malware). Suffix-matched by HostBlocklist at startup, so the
-# registrable-domain lists cover subdomains too. Refreshed on every rebuild — no runtime network
-# dependency. Fetch is best-effort (retries); a briefly-unreachable feed won't fail the build, and
-# the app logs how many domains it actually loaded. Off by default for local Compose builds, which
-# pass FETCH_BLOCKLISTS=false to stay fast and offline (the list is then simply empty = a no-op).
+# ---- Blocklist stage: bake content-policy domain lists into the image ----
+# HaGeZi NSFW (adult) + URLhaus (malware), refreshed on every rebuild — no runtime network
+# dependency. Fetch is best-effort: a briefly-unreachable feed won't fail the build, and the app
+# logs how many domains it loaded. Local Compose builds pass FETCH_BLOCKLISTS=false to stay fast
+# and offline (an empty list is a no-op).
 FROM alpine:3 AS blocklist
 ARG FETCH_BLOCKLISTS=true
 WORKDIR /lists
-# Cache-bust marker: the refresh-blocklist workflow bumps .blocklist-epoch weekly. Copying it before
-# the fetch invalidates the layer below, so a cached rebuild still re-downloads current lists. Without
-# this, an unchanged Dockerfile would cache the fetch and ship stale domains forever.
+# Cache-bust marker, bumped weekly by the refresh-blocklist workflow: copying it before the fetch
+# invalidates the layer below, so a cached rebuild still re-downloads current lists.
 COPY .blocklist-epoch ./.epoch
 RUN set -eux; \
     touch hosts.txt; \

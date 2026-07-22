@@ -11,8 +11,7 @@ export function initUmami(): void {
   document.head.appendChild(script);
 }
 
-// Fires a custom event (no-op when Umami isn't loaded), for outcomes the auto-bound
-// `data-umami-event` click attributes can't see.
+// For outcomes the auto-bound `data-umami-event` click attributes can't see.
 export function track(event: string, data?: Record<string, unknown>): void {
   window.umami?.track(event, data);
 }

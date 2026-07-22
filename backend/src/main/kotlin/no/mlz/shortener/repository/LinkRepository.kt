@@ -14,7 +14,6 @@ data class LinkRecord(
 
 data class DailyClickCount(val date: LocalDate, val count: Long)
 
-// Code collided with an existing row on insert (SQLSTATE 23505).
 class DuplicateCodeException : RuntimeException()
 
 class LinkRepository(private val database: Database) {
@@ -54,8 +53,7 @@ class LinkRepository(private val database: Database) {
         ) > 0
     }
 
-    // Readiness probe: a live connection that answers a trivial query. Throws if the pool can't
-    // hand out a connection (DB down / unreachable); callers treat that as not-ready.
+    // Throws if the pool can't hand out a connection; callers treat that as not-ready.
     fun ping(): Boolean = database.withConnection { conn ->
         conn.queryOne("SELECT 1", map = { it.getInt(1) }) == 1
     }
@@ -81,7 +79,7 @@ class LinkRepository(private val database: Database) {
         ) ?: 0L
     }
 
-    // Ascending, UTC; zero-click days are absent from the result.
+    // Ascending, UTC; zero-click days are absent.
     fun clicksLast7Days(linkId: Long): List<DailyClickCount> = database.withConnection { conn ->
         conn.query(
             "SELECT (clicked_at AT TIME ZONE 'UTC')::date AS d, count(*) AS c " +

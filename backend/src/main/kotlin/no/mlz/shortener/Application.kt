@@ -42,16 +42,16 @@ class AppComponents(
 fun main() {
     val config = AppConfig.load()
     val database = Database(config.db)
-    // Off in production, where migrations are a separate privileged step (the app role has no DDL
-    // rights); on by default so local `./gradlew run` bootstraps the schema. See README §Database hardening.
+    // On by default for local runs; production turns it off — migrations there are a separate
+    // privileged step, and the app role has no DDL rights.
     if (System.getenv("RUN_MIGRATIONS_ON_STARTUP")?.toBoolean() != false) {
         database.migrate(
             migrationUser = System.getenv("DATABASE_MIGRATION_USER"),
             migrationPassword = System.getenv("DATABASE_MIGRATION_PASSWORD"),
         )
     }
-    // Close the pool through the app's ordered stop sequence (after the final click flush), not a
-    // bare JVM hook that would race that flush and drop the last batch.
+    // The pool closes via the ordered stop sequence below, not a JVM hook that would race the
+    // final click flush.
     embeddedServer(Netty, host = config.server.host, port = config.server.port) {
         module(config, LinkRepository(database), onStopped = database::close)
     }.start(wait = true)
@@ -68,8 +68,8 @@ fun Application.module(config: AppConfig, repository: LinkRepository, onStopped:
         environment.log.warn("INTERNAL_API_KEY is unset: management routes (POST/stats/delete) are UNAUTHENTICATED.")
     }
 
-    // Non-secret boot summary: leaves an auditable record of the effective security posture. Never
-    // add DB credentials, the connection string, or the internal key here.
+    // Auditable record of the effective security posture. Never add credentials, the connection
+    // string, or the internal key here.
     environment.log.info(
         "Shortener started: host=${config.server.host} port=${config.server.port} " +
             "baseUrl=${config.app.baseUrl} auth=${if (components.internalApiKey != null) "enabled" else "OPEN"} " +
@@ -79,8 +79,8 @@ fun Application.module(config: AppConfig, repository: LinkRepository, onStopped:
             "redirect=${config.app.rateLimit.redirect.refillPerMinute}/min]",
     )
 
-    // useLastProxy() takes the rightmost X-Forwarded-For entry (the one the trusted proxy appends)
-    // so a client can't prepend a spoofed IP to escape its rate-limit bucket.
+    // useLastProxy() reads the rightmost X-Forwarded-For entry — the one the trusted proxy
+    // appends — so a client can't prepend a spoofed IP to escape its rate-limit bucket.
     if (config.app.trustProxyHeaders) {
         install(XForwardedHeaders) { useLastProxy() }
     }
@@ -98,12 +98,12 @@ fun Application.module(config: AppConfig, repository: LinkRepository, onStopped:
 
     linkRoutes(components)
 
-    // Flush pending clicks (still needs the DB pool) before anything tears it down...
+    // Flush pending clicks while the DB pool is still up; close external resources only after
+    // the server has fully stopped.
     monitor.subscribe(ApplicationStopping) {
         runBlocking { clickTracker.close() }
         appScope.cancel()
     }
-    // ...then close external resources once the server has fully stopped.
     monitor.subscribe(ApplicationStopped) {
         onStopped()
     }

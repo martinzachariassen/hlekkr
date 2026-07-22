@@ -1,4 +1,3 @@
-/* Theme lifted from mlz.no: warm paper, near-black ink, a single teal accent; Inter + a serif display. */
 :root {
   --paper: #ecebe4;
   --paper-2: #e4e2da;
@@ -13,10 +12,8 @@
   --warn-bg: #f2e7cd;
   --warn-ink: #7a4e15;
   --warn-line: #d8b978;
-  /* Inter: a calm, low-contrast grotesque built for screens. Body + UI. */
   --sans: "Inter", system-ui, sans-serif;
   --serif: "Instrument Serif", Georgia, serif;
-  /* Reserved for technical strings (codes, keys, short URLs) where 0/O and l/1 must not blur. */
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   --gutter: clamp(20px, 5vw, 56px);
 }
@@ -475,7 +472,6 @@ h1 {
   transition: height 0.45s ease;
   animation: barGrow 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-/* Stagger the seven columns so the week fills in left-to-right on reveal. */
 .bar-col:nth-child(1) .bar {
   animation-delay: 0.08s;
 }
@@ -533,7 +529,6 @@ h1 {
 }
 
 /* ---- responsive ---- */
-/* Tablet / large phone: tighten the chrome so the header and footer never crowd. */
 @media (max-width: 720px) {
   .topbar,
   .foot {
@@ -544,10 +539,8 @@ h1 {
   }
 }
 
-/* Phones: stack the forms, shrink the display type, and keep everything one column. */
 @media (max-width: 560px) {
-  /* Flow from the top instead of centering in the viewport — no floaty gaps, predictable position.
-     The footer still pins to the bottom via the page grid's trailing auto row. */
+  /* Flow from the top instead of centering; the footer still pins via the grid's trailing row. */
   .stage {
     justify-content: flex-start;
     gap: 20px;
@@ -576,8 +569,7 @@ h1 {
     width: 100%;
   }
 
-  /* Stack each value over a full-width action instead of wrapping the button onto a ragged
-     half-line — the source of the awkward mobile wrapping. */
+  /* Stack value over action so the button never wraps onto a ragged half-line. */
   .result-row {
     flex-direction: column;
     align-items: stretch;
@@ -596,7 +588,6 @@ h1 {
     gap: 16px 24px;
   }
 
-  /* Delete confirm: full-width destructive button, text links left-aligned beneath it. */
   .danger {
     flex-direction: column;
     align-items: flex-start;
@@ -619,7 +610,6 @@ h1 {
   }
 }
 
-/* Small phones: keep the header on one line by tightening it, and stack the footer. */
 @media (max-width: 400px) {
   .topbar {
     gap: 12px;
@@ -638,7 +628,7 @@ h1 {
   }
 }
 
-/* Touch devices: enlarge tap targets that are otherwise text-sized. */
+/* Touch devices: enlarge text-sized tap targets. */
 @media (hover: none) and (pointer: coarse) {
   .nav a,
   .nav .linklike {

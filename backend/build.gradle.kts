@@ -67,11 +67,10 @@ tasks.test {
     }
 }
 
-// Shadow, not Ktor's buildFatJar, so duplicate META-INF/services files (notably Flyway's plugin
-// registry, split across flyway-core and flyway-database-postgresql) are concatenated, not dropped.
-// Shadow 9 (pulled in by the Ktor plugin) defaults duplicatesStrategy to EXCLUDE, which discards the
-// "duplicate" service files before mergeServiceFiles() can merge them — so Flyway loses its core
-// plugins and NPEs at startup (PluginRegister returns null). INCLUDE lets the merge actually run.
+// Shadow, not Ktor's buildFatJar: Flyway's SPI registry is split across flyway-core and
+// flyway-database-postgresql at the same resource path, and Shadow 9's default EXCLUDE strategy
+// discards one half before mergeServiceFiles() can concatenate them — Flyway then NPEs at startup.
+// INCLUDE lets the merge actually run.
 tasks.shadowJar {
     archiveClassifier.set("all")
     mergeServiceFiles()
@@ -81,10 +80,8 @@ tasks.shadowJar {
     }
 }
 
-// Flyway loads its plugins via SPI; that registry is split across flyway-core and
-// flyway-database-postgresql at the same resource path. If the shadow merge ever drops either half,
-// Flyway NPEs at runtime — but every classpath-based test still passes, so it only surfaces in a
-// deployed jar. This guards the packaged artifact so a merge regression fails the build, not prod.
+// A dropped SPI half only surfaces in the deployed jar — every classpath-based test still passes —
+// so guard the packaged artifact and fail the build on a merge regression, not production.
 val verifyFlywayServiceMerge by tasks.registering {
     val jarFile = tasks.shadowJar.flatMap { it.archiveFile }
     inputs.file(jarFile)

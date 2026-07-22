@@ -3,8 +3,6 @@ package no.mlz.shortener.config
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
-// Non-secret defaults live in application.conf; secrets arrive via ${?VAR} env substitution.
-// load() fails fast on a missing required secret, so the app never boots with a blank DB password.
 data class AppConfig(
     val server: ServerConfig,
     val app: AppSettings,
@@ -18,9 +16,9 @@ data class AppConfig(
         val allowedOrigins: List<String>,
         val rateLimit: RateLimitSettings,
         val code: CodeSettings,
-        // Null => management routes are open (local dev). Set in production.
+        // Null => management routes are open (local dev only).
         val internalApiKey: String?,
-        // Trust X-Forwarded-For for the client IP. Only safe behind a trusted proxy.
+        // Reads the client IP from X-Forwarded-For; only safe behind a trusted proxy.
         val trustProxyHeaders: Boolean,
         val blockedHosts: List<String>,
         val blockedHostsFile: String?,
