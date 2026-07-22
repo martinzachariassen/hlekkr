@@ -1,6 +1,4 @@
--- Core schema for the URL shortener.
--- Runs under a privileged migration role at deploy time; the application connects
--- under a least-privilege role that only has DML on these two tables (see README §Database hardening).
+-- Runs under a privileged migration role; the app connects under a DML-only role.
 
 CREATE TABLE links (
     id BIGSERIAL PRIMARY KEY,
@@ -19,8 +17,7 @@ CREATE TABLE clicks (
     id BIGSERIAL PRIMARY KEY,
     link_id BIGINT NOT NULL REFERENCES links (id),
     clicked_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    -- Intentionally stores no IP / user-agent / referrer: counting is analytics,
-    -- collecting identifiers would make this a tracking product (see README).
+    -- Deliberately no IP / user-agent / referrer: counting is analytics, identifiers are tracking.
 );
 
 CREATE INDEX idx_clicks_link_bucket ON clicks (link_id, clicked_at);

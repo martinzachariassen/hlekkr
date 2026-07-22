@@ -12,13 +12,12 @@ import io.ktor.server.routing.routing
 private const val SPEC_RESOURCE = "openapi/documentation.yaml"
 
 // Must match the swagger-ui webjar version in gradle/libs.versions.toml — the webjar embeds it in
-// the resource path. Assets are served same-origin (no CDN) so the docs CSP stays free of any
-// third-party host. staticResources() can't serve these: it maps '.' to '/', mangling the version.
+// the resource path. Served same-origin (no CDN) so the docs CSP allows no third-party host.
 private const val SWAGGER_UI_VERSION = "5.32.8"
 private const val SWAGGER_ASSETS = "META-INF/resources/webjars/swagger-ui/$SWAGGER_UI_VERSION"
 
-// Anchored to a bare filename with a js/css extension: no slashes and no '..', so a request can't
-// traverse out of the vendored asset directory.
+// Bare filename with a js/css extension — no slashes, no '..' — so a request can't traverse out
+// of the vendored asset directory.
 private val ASSET_NAME = Regex("""[a-z0-9-]+\.(js|css)""")
 
 private val SWAGGER_PAGE = """
@@ -45,8 +44,7 @@ private val SWAGGER_PAGE = """
     </html>
 """.trimIndent()
 
-// Hand-authored OpenAPI spec, served as raw YAML and via a self-hosted Swagger UI — both public by
-// design. Assets live under /swagger/dist/ so Caddy's `/swagger/*` matcher proxies them in prod.
+// Assets live under /swagger/dist/ so Caddy's `/swagger/*` matcher proxies them in prod.
 fun Application.configureOpenApi() {
     val spec = environment.classLoader.getResource(SPEC_RESOURCE)?.readText()
     val loader = environment.classLoader

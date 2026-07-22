@@ -3,9 +3,10 @@
 How to work in this repo — a security-hardened URL shortener, built as a portfolio
 project to *show the reasoning* behind persistence, concurrency, and security
 without a framework hiding the decisions. Read this before proposing changes; the
-[README](README.md) carries the full architecture and the rationale behind every
-security choice, and [`backend/README.md`](backend/README.md) /
-[`frontend/README.md`](frontend/README.md) cover each app.
+[README](README.md) carries the architecture overview; the depth lives under `docs/` —
+[`security.md`](docs/security.md) (the security spec), [`backend.md`](docs/backend.md) /
+[`frontend.md`](docs/frontend.md) (per-app setup and the cross-app contract), and
+[`deployment.md`](docs/deployment.md). The per-app READMEs are short pointers.
 
 > General working defaults (git, code style, communication) come from the global
 > agent config outside this repo. This file covers what's specific to this project,
@@ -84,7 +85,8 @@ commented-out code behind.
 
 ## Security — treat the posture as load-bearing
 
-The README's *Security decisions* section is the spec; each item maps to code and an
+`docs/security.md` is the spec (the README keeps the threat → defense summary table);
+each item maps to code and an
 explicit test. When touching `security/`, `service/UrlValidator`, auth, or the
 routes, **do not weaken these without calling it out**, and add/adjust the matching
 test:
@@ -144,6 +146,6 @@ mise run test                 # or: cd backend && ./gradlew build
 ## Deployment
 
 Railway, three services: **web** (Caddy, the only public domain), **api** (private,
-`SERVER_HOST=::` for IPv6), **Postgres** (private). Full variable list and the "why
-CORS isn't the gate" reasoning are in the README — consult it before changing the
-deploy topology, `railway.toml`, Dockerfiles, or the Caddyfile.
+`SERVER_HOST=::` for IPv6), **Postgres** (private). The full variable list lives in
+`docs/deployment.md` and the "why CORS isn't the gate" reasoning in the README — consult
+both before changing the deploy topology, `railway.toml`, Dockerfiles, or the Caddyfile.

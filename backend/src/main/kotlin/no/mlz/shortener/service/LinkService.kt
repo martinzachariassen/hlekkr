@@ -14,8 +14,8 @@ data class CreateLinkResult(val code: String, val shortUrl: String, val ownerTok
 
 data class StatsResult(val totalClicks: Long, val last7Days: List<DailyClickCount>)
 
-// Missing, expired, deleted, and failed owner-token auth all surface as the same
-// LinkNotFoundException so callers can't probe which links exist.
+// Missing, expired, deleted, and failed owner-token auth all surface as the same exception so
+// callers can't probe which links exist.
 class LinkService(
     private val repository: LinkRepository,
     private val urlValidator: UrlValidator,
@@ -38,7 +38,7 @@ class LinkService(
                 repository.insert(code, targetUrl, ownerTokenHash, expiresAt)
                 return CreateLinkResult(code, "$baseUrl/$code", ownerToken)
             } catch (_: DuplicateCodeException) {
-                // Collision — retry with a fresh code.
+                // Collision: retry with a fresh code, fail closed after maxCodeAttempts.
             }
         }
         throw CodeGenerationException()

@@ -1,10 +1,6 @@
-# Local development stack: Postgres 18 + Flyway migrations + the API.
-#
-#   docker compose up --build
-#
-# Runs with zero setup: the ${VAR:-default} values below are DEV-ONLY passwords, safe to commit
-# because they never leave your machine. Override any of them by putting real values in a .env
-# file (git-ignored) — see .env.example. Never reuse these defaults in production.
+# Local stack: Postgres 18 + Flyway migrations + the API. The ${VAR:-default} values are DEV-ONLY
+# passwords that never leave your machine; override via a git-ignored .env (see .env.example) and
+# never reuse them in production.
 
 services:
   db:
@@ -19,8 +15,7 @@ services:
       # Postgres 18+ stores data in a version subdirectory; mount the parent, not /data.
       - pgdata:/var/lib/postgresql
     configs:
-      # First-init SQL, inlined (no separate script file). Postgres runs *.sql in this directory as
-      # POSTGRES_USER against POSTGRES_DB on first boot.
+      # Postgres runs *.sql in this directory as POSTGRES_USER on first boot.
       - source: app_role_init
         target: /docker-entrypoint-initdb.d/01-app-role.sql
     healthcheck:
@@ -79,10 +74,9 @@ volumes:
   pgdata:
 
 configs:
-  # Least-privilege application role (§2.9): the app connects as this DML-only role, while DDL and
-  # migrations run under the privileged POSTGRES_USER. ALTER DEFAULT PRIVILEGES makes the grants
-  # apply automatically to the tables Flyway creates next, so nothing needs re-granting afterwards.
-  # The ${VAR:-default} values are interpolated by Compose (dev-only defaults; override via .env).
+  # Least-privilege app role: DML only, while DDL/migrations run as the privileged POSTGRES_USER.
+  # ALTER DEFAULT PRIVILEGES applies the grants to the tables Flyway creates next, so nothing
+  # needs re-granting afterwards.
   app_role_init:
     content: |
       CREATE ROLE "${APP_DB_USER:-shortener_app}" LOGIN PASSWORD '${APP_DB_PASSWORD:-dev_app_pw}';

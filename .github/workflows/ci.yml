@@ -50,7 +50,7 @@ jobs:
           path: backend/build/reports/tests/test
           if-no-files-found: ignore
 
-  # Fails on any HIGH/CRITICAL CVE in declared dependencies (§2.11). Complements
+  # Fails on any HIGH/CRITICAL CVE in declared dependencies. Complements
   # dependency-review (PR-diff only) and Dependabot (reacts after merge) by
   # scanning the whole dependency graph on every push and PR.
   dependency-scan:

@@ -1,14 +1,11 @@
 name: Refresh blocklist
 
-# The content denylist (adult + malware target domains) is fetched at Docker build time and baked
-# into the image (see backend/Dockerfile), so it is only ever as fresh as the last deploy. This job
-# runs weekly and:
+# The content denylist is baked at Docker build time (see backend/Dockerfile), so it is only as
+# fresh as the last deploy. Weekly, this job:
 #   1. re-fetches both upstream lists and fails LOUDLY if either 404s or comes back suspiciously
-#      small — an early warning that an upstream URL rotted (as HaGeZi's once did), instead of the
-#      build silently baking an empty list;
-#   2. bumps backend/.blocklist-epoch, which busts the Dockerfile fetch-layer cache. Railway
-#      auto-deploys the push and rebuilds with freshly-downloaded lists.
-# No secrets, no runtime network dependency. Assumes Railway auto-deploy on push to the deploy branch.
+#      small — a canary for upstream URL rot, instead of silently baking an empty list;
+#   2. bumps backend/.blocklist-epoch, busting the Dockerfile fetch-layer cache; Railway
+#      auto-deploys the push and rebuilds with fresh lists.
 on:
   schedule:
     - cron: "17 4 * * 1" # Mondays 04:17 UTC — off-peak, and off the top of the hour.
