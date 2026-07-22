@@ -14,7 +14,7 @@ private const val SPEC_RESOURCE = "openapi/documentation.yaml"
 // Must match the swagger-ui webjar version in gradle/libs.versions.toml — the webjar embeds it in
 // the resource path. Assets are served same-origin (no CDN) so the docs CSP stays free of any
 // third-party host. staticResources() can't serve these: it maps '.' to '/', mangling the version.
-private const val SWAGGER_UI_VERSION = "5.25.3"
+private const val SWAGGER_UI_VERSION = "5.32.8"
 private const val SWAGGER_ASSETS = "META-INF/resources/webjars/swagger-ui/$SWAGGER_UI_VERSION"
 
 // Anchored to a bare filename with a js/css extension: no slashes and no '..', so a request can't

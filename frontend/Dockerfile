@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build the static bundle ----
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# Node 26 no longer bundles corepack; reinstall it so the pinned pnpm (package.json packageManager) is used.
+RUN npm install -g corepack@latest && corepack enable
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile

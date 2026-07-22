@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Keep these URLs in sync with backend/Dockerfile's blocklist stage.
       - name: Fetch and sanity-check upstream lists
