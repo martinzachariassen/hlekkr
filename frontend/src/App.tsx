@@ -9,7 +9,7 @@ import {
 } from "./api.ts";
 import { track } from "./umami.ts";
 
-const SOURCE_URL = "https://github.com/martinzachariassen/url-shortener";
+const SOURCE_URL = "https://github.com/martinzachariassen/hlekkr";
 
 type Mode = "create" | "manage";
 

@@ -10,10 +10,10 @@ project to *show the reasoning* behind persistence, concurrency, and security,
 with a [Kotlin](https://kotlinlang.org) + [Ktor](https://ktor.io) API over raw
 JDBC and a framework-free [React](https://react.dev) client.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/ci.yml)
-[![Frontend CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/frontend-ci.yml?branch=main&label=Frontend&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/frontend-ci.yml)
-[![CodeQL](https://img.shields.io/github/actions/workflow/status/martinzachariassen/url-shortener/codeql.yml?branch=main&label=CodeQL&style=flat-square)](https://github.com/martinzachariassen/url-shortener/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/martinzachariassen/url-shortener/badge)](https://scorecard.dev/viewer/?uri=github.com/martinzachariassen/url-shortener)
+[![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/ci.yml)
+[![Frontend CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/frontend-ci.yml?branch=main&label=Frontend&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/frontend-ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/martinzachariassen/hlekkr/codeql.yml?branch=main&label=CodeQL&style=flat-square)](https://github.com/martinzachariassen/hlekkr/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/martinzachariassen/hlekkr/badge)](https://scorecard.dev/viewer/?uri=github.com/martinzachariassen/hlekkr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Ktor](https://img.shields.io/badge/Ktor-3.5-087CFA?style=flat-square&logo=ktor&logoColor=white)](https://ktor.io)
