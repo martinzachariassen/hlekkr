@@ -29,7 +29,8 @@ bundle as public — never put a real secret in it.
 | `VITE_UMAMI_SRC` + `VITE_UMAMI_WEBSITE_ID` | Enable [Umami](https://umami.is) analytics. Unset ⇒ zero analytics code ships. |
 
 There is deliberately **no** internal-key variable here: in production the key lives on the Caddy
-proxy and is injected server-side, so it never reaches the browser. See the root README (Deployment).
+proxy and is injected server-side, so it never reaches the browser. See the root README
+(*Restricting the API to your frontend*).
 
 ## Production build & proxy
 

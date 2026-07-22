@@ -144,6 +144,6 @@ mise run test                 # or: cd backend && ./gradlew build
 ## Deployment
 
 Railway, three services: **web** (Caddy, the only public domain), **api** (private,
-`SERVER_HOST=::` for IPv6), **Postgres** (private). Full variable list and the "why
-CORS isn't the gate" reasoning are in the README — consult it before changing the
-deploy topology, `railway.toml`, Dockerfiles, or the Caddyfile.
+`SERVER_HOST=::` for IPv6), **Postgres** (private). The full variable list lives in
+`docs/deployment.md` and the "why CORS isn't the gate" reasoning in the README — consult
+both before changing the deploy topology, `railway.toml`, Dockerfiles, or the Caddyfile.
