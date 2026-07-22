@@ -20,9 +20,9 @@ JDBC and a framework-free [React](https://react.dev) client.
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Deployed on Railway](https://img.shields.io/badge/Railway-deploy-0B0D0E?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
 
-[**Live site**](https://short.up.railway.app) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
+[**Live site**](https://short.mlz.no) · [What it is](#what-it-is) · [Quick start](#quick-start) · [How it works](#how-it-works) · [API](#api) · [Security](#security-decisions) · [Deployment](#deployment) · [Docs](docs)
 
-<a href="https://short.up.railway.app">
+<a href="https://short.mlz.no">
   <img src="frontend/public/assets/social/og.png" alt="short — a link shortener that doesn't track you" width="640" />
 </a>
 
