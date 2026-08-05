@@ -332,6 +332,7 @@ function ManageView({ seed }: { seed: CreatedLink | null }) {
 
 function StatsPanel({ stats, busy, onDelete }: { stats: Stats; busy: boolean; onDelete: () => void }) {
   const [confirming, setConfirming] = useState(false);
+  // Floor of 1 avoids a divide-by-zero (NaN bar heights) on an all-zero week.
   const max = Math.max(1, ...stats.last7Days.map((d) => d.count));
 
   return (
