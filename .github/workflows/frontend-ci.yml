@@ -47,4 +47,4 @@ jobs:
 
       # Guard the container recipe (Dockerfile + Caddyfile copy) against rot.
       - name: Build production image
-        run: docker build -t url-shortener-web .
+        run: docker build -t hlekkr-web .

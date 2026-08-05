@@ -148,7 +148,7 @@ deliverable here, not an accident.
 ## Project structure
 
 ```
-url-shortener/
+hlekkr/
 ├── backend/                     # Ktor API (Kotlin, raw JDBC, Gradle)
 │   └── src/main/kotlin/no/mlz/shortener/
 │       ├── config/  plugins/    # AppConfig + explicit Ktor feature install
