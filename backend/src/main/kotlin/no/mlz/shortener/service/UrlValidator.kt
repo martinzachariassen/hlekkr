@@ -75,11 +75,10 @@ class UrlValidator(baseUrl: String, private val blocklist: HostBlocklist = HostB
         return parseIpv4(host)
     }
 
-    // Canonicalize an IPv4 literal the way a browser/inet_aton would, so alternate encodings
-    // (decimal 2130706433, hex 0x7f000001, octal 0177.0.0.1, short-form 10.1) resolve to the address
-    // a client would actually reach before being range-checked. Java's getByName is NOT used: it
-    // misreads a leading-zero part as decimal, not octal. Returns null for a genuine hostname, so
-    // no DNS is ever performed.
+    // Canonicalizes IPv4 literals the way a browser/inet_aton would (decimal, hex, octal,
+    // short-form), so alternate encodings resolve to the address actually reached before
+    // range-checking. Not getByName: it treats a leading-zero octet as decimal, not octal.
+    // Null means a genuine hostname — no DNS involved.
     private fun parseIpv4(host: String): InetAddress? {
         val parts = host.split('.')
         if (parts.size > 4) return null
