@@ -174,14 +174,12 @@ class LinkRoutesTest {
 
     @Test
     fun `sql injection payloads are inert`() = appTest {
-        // As a target URL: rejected as invalid, no 500.
         val asTarget = jsonClient().post("/links") {
             contentType(ContentType.Application.Json)
             setBody("""{"targetUrl":"'; DROP TABLE links; --"}""")
         }
         assertEquals(HttpStatusCode.BadRequest, asTarget.status)
 
-        // As a path param: treated as a lookup key -> 404.
         assertEquals(HttpStatusCode.NotFound, jsonClient().get("/abc'--").status)
         assertTrue(createLink("https://example.com").code.isNotBlank()) // table survived
     }

@@ -27,6 +27,8 @@ class TokenBucketRateLimiter(
 
     internal fun trackedKeys(): Int = buckets.size
 
+    // ConcurrentHashMap only makes lookup/insertion of a bucket thread-safe; concurrent requests
+    // for the same key still mutate one Bucket's state, hence the per-bucket lock below.
     private inner class Bucket(private var tokens: Double, private var lastRefill: Long) {
         @Synchronized
         fun isReplenished(): Boolean {

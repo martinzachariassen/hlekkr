@@ -131,6 +131,8 @@ private suspend fun RoutingContext.receiveCreateRequest(maxBytes: Long): CreateL
     val declaredLength = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
     if (declaredLength != null && declaredLength > maxBytes) throw PayloadTooLargeException()
 
+    // Content-Length can be absent or a lying client can send more than it declared, so the
+    // header check alone isn't enough — stream in chunks and re-check the running total too.
     val bytes = withContext(Dispatchers.IO) {
         call.receiveStream().use { input ->
             val out = ByteArrayOutputStream()

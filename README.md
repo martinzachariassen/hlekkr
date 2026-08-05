@@ -70,6 +70,9 @@ You need [mise](https://mise.jdx.dev) and Docker. One command pins the toolchain
 the web app — with dev-only defaults, so there's nothing to configure for a first run:
 
 ```bash
+git clone git@github.com:martinzachariassen/hlekkr.git
+cd hlekkr
+
 mise install      # first time only: fetch the pinned tools
 mise run dev      # API on :8080, web app on :5173 — Ctrl-C stops all
 ```
@@ -148,7 +151,7 @@ deliverable here, not an accident.
 ## Project structure
 
 ```
-url-shortener/
+hlekkr/
 ├── backend/                     # Ktor API (Kotlin, raw JDBC, Gradle)
 │   └── src/main/kotlin/no/mlz/shortener/
 │       ├── config/  plugins/    # AppConfig + explicit Ktor feature install
@@ -205,7 +208,8 @@ code and to an explicit test. The short version:
 | Oversized payloads | Bodies streamed with a hard 16 KB cap → `413` |
 
 The full reasoning behind each decision — and why the service key, not CORS, is the real
-gate — is in [`docs/security.md`](docs/security.md).
+gate — is in [`docs/security.md`](docs/security.md). Found a vulnerability? See
+[`SECURITY.md`](SECURITY.md) for how to report it.
 
 ## Deployment
 

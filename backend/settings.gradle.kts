@@ -1,1 +1,1 @@
-rootProject.name = "url-shortener-api"
+rootProject.name = "hlekkr-api"

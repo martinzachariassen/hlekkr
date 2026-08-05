@@ -25,7 +25,7 @@ class RateLimiterTest {
 
     @Test
     fun `refills over time`() {
-        val limiter = limiter(capacity = 1, perMinute = 60) // 1 token per second
+        val limiter = limiter(capacity = 1, perMinute = 60)
 
         assertTrue(limiter.check("ip").allowed)
         assertFalse(limiter.check("ip").allowed)
@@ -45,7 +45,7 @@ class RateLimiterTest {
 
     @Test
     fun `retryAfter reflects the wait for one token`() {
-        val limiter = limiter(capacity = 1, perMinute = 60) // 1/sec
+        val limiter = limiter(capacity = 1, perMinute = 60)
         limiter.check("ip")
         assertEquals(1, limiter.check("ip").retryAfterSeconds)
     }
