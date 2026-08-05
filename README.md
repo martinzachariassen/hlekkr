@@ -70,6 +70,9 @@ You need [mise](https://mise.jdx.dev) and Docker. One command pins the toolchain
 the web app — with dev-only defaults, so there's nothing to configure for a first run:
 
 ```bash
+git clone git@github.com:martinzachariassen/hlekkr.git
+cd hlekkr
+
 mise install      # first time only: fetch the pinned tools
 mise run dev      # API on :8080, web app on :5173 — Ctrl-C stops all
 ```
