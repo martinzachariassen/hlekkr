@@ -26,9 +26,7 @@ async function toError(res: Response): Promise<Error> {
   let body: { error?: string; correlationId?: string } | null = null;
   try {
     body = await res.json();
-  } catch {
-    /* non-JSON error body */
-  }
+  } catch {}
   switch (res.status) {
     case 400:
       return new Error(

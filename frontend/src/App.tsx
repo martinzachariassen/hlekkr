@@ -391,9 +391,7 @@ function CopyButton({ value, label, event }: { value: string; label: string; eve
       ta.select();
       try {
         document.execCommand("copy");
-      } catch {
-        /* clipboard unavailable */
-      }
+      } catch {}
       document.body.removeChild(ta);
     }
     setCopied(true);
