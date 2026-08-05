@@ -208,7 +208,8 @@ code and to an explicit test. The short version:
 | Oversized payloads | Bodies streamed with a hard 16 KB cap → `413` |
 
 The full reasoning behind each decision — and why the service key, not CORS, is the real
-gate — is in [`docs/security.md`](docs/security.md).
+gate — is in [`docs/security.md`](docs/security.md). Found a vulnerability? See
+[`SECURITY.md`](SECURITY.md) for how to report it.
 
 ## Deployment
 
