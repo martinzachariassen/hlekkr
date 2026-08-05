@@ -1,6 +1,6 @@
 [tools]
 java = "temurin-25"
-node = "lts"
+node = "24"
 # Pinned (not "latest") so local and CI resolve identical deps; matches package.json packageManager.
 pnpm = "10.11.0"
 
