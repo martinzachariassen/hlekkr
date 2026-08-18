@@ -2,7 +2,7 @@
 kotlin = "2.4.10"
 ktor = "3.5.1"
 hikari = "7.1.0"
-flyway = "13.1.0"
+flyway = "13.3.0"
 postgresql = "42.7.13"
 serialization = "1.11.0"
 coroutines = "1.11.0"
